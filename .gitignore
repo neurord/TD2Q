@@ -1,0 +1,8 @@
+*.npz
+*.png
+*.pyc
+*.slurm
+*.pxp
+*.docx
+*.ai
+*.psd
