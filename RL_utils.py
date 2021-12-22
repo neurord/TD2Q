@@ -34,7 +34,10 @@ def plot_trajectory(output_data,title,figure_sets):
                     axis[ax].set_ylabel('reward')
                     axis[ax].set_ylim([np.floor(ymin),np.ceil(ymax)])
                 else:
-                    ylabel=ta[0][1]+' '+ta[1]
+                    if len(ta[0])>1:
+                        ylabel=ta[0][0][0:4]+','+ta[0][1]+' '+ta[1][0:3]
+                    else:
+                        ylabel=ta[0][0]+' '+ta[1]
                     axis[ax].set_ylabel(ylabel)
                     axis[ax].set_ylim([0,np.ceil(ymax)*1.05])
                     #if phs == 'discrim' or phs == 'reverse':
@@ -45,13 +48,13 @@ def plot_trajectory(output_data,title,figure_sets):
         axis[-1].set_xlabel('block')
     plt.show()
 
-def save_results(results,epochs,allresults,key_dict,resultslist):  
+def save_results(results,key_dict,resultslist):  
     for phase in results.keys():
-        for sacombo in results[phase].keys():
-            for ep,counts in results[phase][sacombo].items():
-                allresults[phase][key_dict[sacombo]+'_'+ep].append(np.round(np.mean(counts),3))
-                resultslist[phase][key_dict[sacombo]+'_'+ep].append(counts)
-    return allresults,resultslist
+        if phase in resultslist.keys():
+            for sacombo in results[phase].keys():
+                for ep,counts in results[phase][sacombo].items():
+                    resultslist[phase][key_dict[sacombo]+'_'+ep].append(counts)
+    return resultslist
 '''
 def save_results(results,epochs,allresults,resultslist):
     for phase in results.keys():
