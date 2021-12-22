@@ -8,6 +8,7 @@ import numpy as np
 
 import sequence_env as task_env
 import agent_twoQtwoSsplit as QL
+import RL_utils as rlu
 ##########################################################
 class RL:
     """Reinforcement learning by interaction of Environment and Agent"""
@@ -19,15 +20,20 @@ class RL:
         self.agent = agent(self.env.actions,Aparams,oldQ)
         self.vis = True  # visualization
         self.name=None
+        self.results={'state': [], 'reward':[],'action':[]}
             
     def episode(self, tmax=50,noise=0,cues=[],info=False):
         state = self.env.start() #state tuple, (0,0) to start
-        self.results={'state': [state], 'reward':[0],'action':[0]} 
-        #print('starting from',self.env.state_from_number(state))
-        action = self.agent.start(state,cues) #1st action is random 
+        reward=0
+        if len(self.agent.Q): #if Q matrix exists, take a step
+            action = self.agent.step(reward, state, noise,cues=cues,prn_info=info)                            
+        else: #1st action is random
+            #print('starting from',self.env.state_from_number(state))
+            action = self.agent.start(state,cues) 
+        self.append_results(action,reward)
         # Repeat interaction
         if info:
-            print('start episode, from Q=', self.agent.Q,'\nresults',self.results)
+            print('start episode, from Q=', self.agent.Q,'\nresults',self.results)            
         for t in range(1, tmax+1):
             reward, state = self.env.step(action,prn_info=info) #determine new state and reward from env
             #print('t=',t,'state',state,'=',self.env.state_from_number(state),'reward=',reward)
@@ -56,7 +62,7 @@ class RL:
         offset=0.1
         for i,((st,lbl),symbol) in enumerate(zip(self.env.state_types.items(),['k.','bx'])):
             yval=[s_tup[st]+i*offset for s_tup in self.results['state']]
-            ax[2].plot(xvals,yval,symbol,label=lbl)
+            ax[2].plot(xvals,yval,marker=symbol[-1],color=symbol[0],label=lbl,linestyle='None')
         ax[2].set_ylabel('state')
         ax[2].legend()
 
@@ -80,14 +86,14 @@ class RL:
     def set_of_plots(self,numQ,noise,hx_len,title2='',hist=False):
         import matplotlib.pyplot as plt
         plt.ion()
-        self.visual(numQ+'Q'+title2)     
+        self.visual(numQ+'Q'+title2) #differs from RL_TD2Q in parameter numQ vs learn_phase , and using hx_len    
         for ii in range(len(self.agent.Q)):
             self.agent.visual(self.agent.Q[ii],labels=self.state_to_words(ii,noise,hx_len),
                          title=numQ+'Q, Q'+str(ii+1))
         if hist:
             self.agent.plot_learn_history(title=numQ+'Q, Q'+str(ii+1))
     
-    def get_statenum(self,state):
+    def get_statenum(self,state): ####### Not part of RL_TD2Q
         if state[0] in self.env.states['loc']:
             state0num=self.env.states['loc'][state[0]]
         else:
@@ -107,7 +113,7 @@ class RL:
                     matching_state1.append(st)
         return state0num,state1num,matching_state1
             
-    def count_actions(self,allresults,sa_combo,event_subset,accum_type='mean'):
+    def count_actions(self,allresults,sa_combo,event_subset,accum_type='mean'): ####### Not part of RL_TD2Q
         #2021 jan 4: added multiply rewared by events_per_trial to get mean reward per trial
         trial_subset=event_subset/self.agent.events_per_trial
         for sa in sa_combo:
@@ -125,24 +131,24 @@ class RL:
                         if (state[0]=='*' or self.results['state'][tr][0]==state0num) and \
                             (self.results['state'][tr][1]==state1num or self.env.state_from_number(self.results['state'][tr])[1] in matching_state1):
                             sa_count+=1
-                allresults[sa][tf].append(sa_count/trial_subset)
+                allresults[sa][tf].append(sa_count/trial_subset) #events per trial
         if accum_type=='count':
             max_rwd=np.max(self.results['reward'])             
-            allresults['rwd']['Beg'].append(self.results['reward'][0:event_subset].count(max_rwd)) 
-            allresults['rwd']['End'].append(self.results['reward'][-event_subset:].count(max_rwd))   
+            allresults['rwd']['Beg'].append(self.results['reward'][0:event_subset].count(max_rwd))/trial_subset #number of rewards per trial
+            allresults['rwd']['End'].append(self.results['reward'][-event_subset:].count(max_rwd))/trial_subset #maximum = 1
         else:
-            allresults['rwd']['Beg'].append(np.mean(self.results['reward'][0:event_subset])*self.agent.events_per_trial) 
+            allresults['rwd']['Beg'].append(np.mean(self.results['reward'][0:event_subset])*self.agent.events_per_trial) #mean reward per trial
             allresults['rwd']['End'].append(np.mean(self.results['reward'][-event_subset:])*self.agent.events_per_trial)            
         return allresults 
 
-    def trajectory(self,traject,sa_combo, num_blocks,events_per_block,accum_type='mean'):
+    def trajectory(self,traject,sa_combo, num_blocks,events_per_block,numQphs,accum_type='mean'):  #differs from RL_TD2Q 
         for sa in sa_combo:
             if sa=='rwd':
                 if accum_type=='count':
                     max_rwd=np.max(self.results['reward'])  
-                    traject['rwd'].append([self.results['reward'][block*events_per_block:(block+1)*events_per_block].count(max_rwd) for block in range(num_blocks)])
+                    traject[numQphs]['rwd'].append([self.results['reward'][block*events_per_block:(block+1)*events_per_block].count(max_rwd) for block in range(num_blocks)]) #rewards per block
                 else:
-                    traject['rwd'].append([self.agent.events_per_trial*np.mean(self.results['reward'][block*events_per_block:(block+1)*events_per_block]) for block in range(num_blocks)])
+                    traject[numQphs]['rwd'].append([self.agent.events_per_trial*np.mean(self.results['reward'][block*events_per_block:(block+1)*events_per_block]) for block in range(num_blocks)])
             else:    
                 anum=self.env.actions[sa[1]]
                 state=sa[0]
@@ -157,38 +163,8 @@ class RL:
                                 (self.results['state'][tr][1]==state1num or self.env.state_from_number(self.results['state'][tr])[1] in matching_state1):
                                     sa_count+=1
                     block_count.append(sa_count)
-                traject[sa].append(block_count)
+                traject[numQphs][sa].append(block_count)
         return traject
-
-def construct_key(state_actions,epochs=None):
-    keys={}
-    for sacombo in state_actions:
-        if sacombo =='rwd':
-            env=['rwd']
-            ac=''
-        else:
-            env=sacombo[0]
-            ac=sacombo[1]
-        keys[sacombo]='_'.join(env)+'_'+ac
-    return keys
-
-def save_results(results,epochs,allresults,key_dict,resultslist):   
-    for sacombo in results.keys():
-        for ep,counts in results[sacombo].items():
-            allresults[key_dict[sacombo]+'_'+ep].append(np.round(np.mean(counts),3))
-            resultslist[key_dict[sacombo]+'_'+ep].append(counts)
-    return allresults,resultslist
-
-def plot_trajectory(output_data,Hx_len,events_per_block,min_act):    
-    from matplotlib import pyplot as plt
-    fig,axis=plt.subplots(nrows=len(output_data[1].keys()),ncols=1,sharex=True)
-    fig.suptitle('History Length '+str(Hx_len)+'\nminimum '+str(min_act)+' actions per reward')
-    for numQ in output_data.keys():
-        for ax,(ta,data) in enumerate(output_data[numQ].items()):
-            axis[ax].errorbar(range(len(data['mean'])),data['mean'],yerr=data['sterr'],capsize=5,label='num Q'+str(numQ))
-            axis[ax].set_ylabel(ta)
-            axis[ax].legend()
-    axis[-1].set_xlabel('blocks of '+str(events_per_block)+' actions')
 
 def accum_Qhx(states,actions,rl,numQ,Qhx=None):
     #find the state number corresponding to states for each learning phase
@@ -235,22 +211,22 @@ def accum_Qhx(states,actions,rl,numQ,Qhx=None):
 if __name__ == "__main__":
     numtrials=600
     runs=10
-    #additional cues that are part of the state for the agent, but not environment
     #If want to add reward and time since reward to cues, need to divide by ~100
     noise=0.0 #make noise small enough or state_thresh small enough to minimize new states in acquisition
-    #Specify which learning protocols/phases to implement
     #control output
     printR=False #print environment Reward matrix
     Info=False #print information for debugging
     plot_hist=0#1: plot Q, 2: plot the time since last reward
-    save_data=False #write output data in npz file
-    Qvalues=[1,2]
+    save_data=True #write output data in npz file
+    Qvalues=[1,2] #simulate using these values for numQ
+    inactivate=None#set to None to skip the inactivation test at the end
+    inactivate_blocks=0
 
     ########## Plot Q values over time for these states and actions 
     plot_Qhx=True       
     actions_colors={'goL':'r','goR':'b','press':'k','goMag':'grey'}
 
-    from SequenceTaskParam import Hx_len
+    from SequenceTaskParam import Hx_len,rwd
     if Hx_len==3:
         #MINIMUM actions for reward = 6, so maximum rewards = 1 per 6 "trials"
         state_action_combos=[(('*','*LL'), 'goR'),(('Rlever','*LL'),'press'),(('Rlever','LLR'),'press')]
@@ -261,88 +237,123 @@ if __name__ == "__main__":
         events_per_trial=7
     else:
         print('unrecognized press history length')
-    
+    max_rwd=rwd['base']*(events_per_trial-1)+rwd['reward']  
     plot_Qstates=[state[0] for state in state_action_combos]
     numevents=numtrials*events_per_trial #number of events/actions allowed for agent per run/trial
     trial_subset=int(0.05*numevents)# display mean reward and count actions over 1st and last of these number of trials 
-    max_correct=trial_subset/events_per_trial/100 #in units of %
     epochs=['Beg','End']
    
     trials_per_block=10
     events_per_block=trials_per_block* events_per_trial
     num_blocks=int((numevents+1)/events_per_block)
-        
+    
     from SequenceTaskParam import params,states,act
     from SequenceTaskParam import Tloc,R,env_params
+    #optionally add blocks of runs with D1 or D2 inactivated
     #update some parameters
     params['distance']='Euclidean'
     params['wt_learning']=False
     params['events_per_trial']=events_per_trial
     params['decision_rule']=None #'delta'#'combo', 'delta', 'sumQ2', None means use choose_winner
-    params['Q2other']=0.05  #heterosynaptic syn plas of Q2 for other actions
+    params['Q2other']=0.1  #heterosynaptic syn plas of Q2 for other actions
     params['forgetting']=0#0.2 #heterosynaptic decrease Q1 for other actions
+    params['beta_min']=params['beta']
+    params['split']=True
+    params['decision_rule']=None#'delta'
     #lower means more states
-    state_thresh={'Q1':[0.75,0],'Q2':[0.75,0.875]}
+    state_thresh={'Q1':[0.75,0],'Q2':[0.75,0.875]} #without normalized ED, with heterosynaptic LTP
+    if params['Q2other']<=0.05:
+        state_thresh={'Q1':[0.75,0],'Q2':[0.75,0.75]} #or st2=0.625 with normalized ED, with heterosynaptic LTP and LTD, q2o=0.05
+        alpha={'Q1':[0.2,0],'Q2':[0.2,0.25]} 
+    elif params['Q2other']==0.1:   
+        state_thresh={'Q1':[0.75,0],'Q2':[0.75,0.625]} #or st2= 0.875 with normalized ED, with heterosynaptic LTP and LTD, q2o=0.1
+        alpha={'Q1':[0.2,0],'Q2':[0.2,0.35]}    
+    elif params['Q2other']==0.2:
+        state_thresh={'Q1':[0.75,0],'Q2':[0.875,0.875]} #or st= 0.625,0.625 with normalized ED, with heterosynaptic LTP and LTD, q2o=0.2
+        alpha={'Q1':[0.2,0],'Q2':[0.2,0.3]}  #or alpha2=0.35 with st=0.625
     #params['state_thresh']=[0.25,0.275]#[0.15,0.2] #threshold on prob for creating new state using Gaussian mixture
     # higher means more states. Adjusted so that in new context, Q2 creates new states, but not Q1
-    alpha={'Q1':[0.2,0],'Q2':[0.2,0.3]}    
     #params['alpha']=[0.3,0.15] # [0.2,0.14] # double learning to learn in half the trials, slower for Q2 - D2 neurons
-    output_data={q:{}for q in Qvalues}
+    output_data={q:{} for q in Qvalues}
     all_Qhx={q:{} for q in Qvalues}
-    
+    numchars=6 
+    state_subset=['RRLL','RLLR']
+
+    params['events_per_block']=events_per_block
+    params['trials_per_block']=trials_per_block
+    params['trial_subset']=trial_subset
+    params['inact']=inactivate 
+    params['inact_blocks']=inactivate_blocks
+
+    sa_keys=rlu.construct_key(state_action_combos +['rwd'],epochs)
+    results={numQ:{sa:{'Beg':[],'End':[]} for sa in state_action_combos+['rwd']} for numQ in Qvalues}
+    resultslist={numQ:{k+'_'+ep:[] for k in sa_keys.values() for ep in epochs} for numQ in Qvalues}
+    traject_dict={numQ:{k:[] for k in sa_keys.keys()} for numQ in Qvalues}
+
     for numQ in Qvalues:
-        params['numQ']=numQ
-        params['state_thresh']=state_thresh['Q'+str(numQ)]  
-        params['alpha']= alpha['Q'+str(numQ)]  
-        results={sa:{'Beg':[],'End':[]} for sa in state_action_combos+['rwd']}
-        keys=construct_key(state_action_combos +['rwd'],epochs)
-        allresults={k+'_'+ep:[] for k in keys.values() for ep in epochs}
-        #allresults['params']={p:[] for p in parameters} #to store list of parameters
-        resultslist={k+'_'+ep:[] for k in keys.values() for ep in epochs}
-        #resultslist['params']={p:[] for p in parameters}
-        traject_dict={k:[] for k in keys.keys()}
+        resultslist[numQ]['params']={p:[] for p in params}
         Qhx=None
         for r in range(runs):
+            params['numQ']=numQ
+            params['state_thresh']=state_thresh['Q'+str(numQ)]  
+            params['alpha']= alpha['Q'+str(numQ)] 
             if runs==1:
                 print('&&&&&&&&&&&&&&&&&&&& STATES',states,'\n     ****  R:',R.keys(),'\n   ****   T:',Tloc.keys())
             ######### acquisition trials, context A, only 6 Khz + L turn allowed #########
             acq = RL(task_env.separable_T, QL.QL, states,act,R,Tloc,params,env_params,printR=printR)
             acq.episode(numevents,noise=noise,info=Info)
-            #acq.set_of_plots('LLRR, numQ='+str(params['numQ']),noise,Hx_len,hist=plot_hist)
-            results=acq.count_actions(results,state_action_combos,trial_subset,accum_type='count')
-            traject_dict=acq.trajectory(traject_dict, keys,num_blocks,events_per_block,accum_type='count')
-            if runs==1:
+            if params['inact'] and numQ==2:
+                if params['inact']=='D2':
+                    acq.agent.numQ=1
+                elif params['inact']=='D1':
+                    acq.agent.Q[0]=np.zeros(np.shape(acq.agent.Q[0]))
+                    acq.agent.alpha[0]=0
+                acq.episode(events_per_block*params['inact_blocks'],noise=noise,info=Info)
+                #acq.set_of_plots('LLRR, numQ='+str(params['numQ']),noise,Hx_len,hist=plot_hist)
+            results[numQ]=acq.count_actions(results[numQ],state_action_combos,trial_subset,accum_type='mean')#,accum_type='count')
+            traject_dict=acq.trajectory(traject_dict, sa_keys,num_blocks+params['inact_blocks'],events_per_block,numQ,accum_type='mean')#,accum_type='count')
+            if r<1:
                 acq.set_of_plots(str(numQ),noise,Hx_len,title2='',hist=plot_hist)
                 #acq.visual()
-            if plot_Qhx: #need to return state_nums? which may differ for each run
+            if plot_Qhx: #need to return state_nums, which may differ for each run
                 Qhx,state_nums=accum_Qhx(plot_Qstates,actions_colors,acq,params['numQ'],Qhx)
             #del acq #to free up memory
-        all_Qhx[numQ]=Qhx        
-        #for p in allresults['params'].keys():
-        #    allresults['params'][p].append(params[p])                #
-        #    resultslist['params'][p].append(params[p])                #
-        allresults,resultslist=save_results(results,epochs,allresults,keys,resultslist)
-        for ta in traject_dict.keys():
-            output_data[numQ][ta]={'mean':np.mean(traject_dict[ta],axis=0),'sterr':np.std(traject_dict[ta],axis=0)/np.sqrt(runs-1)}
+            print('numQ=',numQ,', run',r,'Q0 mat states=',len(acq.agent.Q[0]),'alpha',acq.agent.alpha)
+        all_Qhx[numQ]=Qhx  
+        resultslist=rlu.save_results(results,sa_keys,resultslist)      
+        for p in resultslist[numQ]['params'].keys():               #
+            resultslist[numQ]['params'][p].append(params[p])                #
+        for ta in traject_dict[numQ].keys():
+            output_data[numQ][ta]={'mean':np.mean(traject_dict[numQ][ta],axis=0),'sterr':np.std(traject_dict[numQ][ta],axis=0)/np.sqrt(runs-1)}
         print('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%')
         print(' Using',params['numQ'], 'Q, alpha=',params['alpha'],'thresh',params['state_thresh'], 'runs',runs,'of total events',numevents)
         print(' weights:',[k+':'+str(params[k]) for k in params.keys() if k.startswith('wt')])
         print('Q2 hetero=',params['Q2other'],'decision rule=',params['decision_rule'])
         print('counts from ',trial_subset,' events: BEGIN    END    std over ',runs,'runs. Hx_len=',Hx_len)
-        for sa_combo,counts in results.items():
-            print(sa_combo,':::',np.round(np.mean(counts['Beg'])/max_correct,2),'% +/-',np.round(np.std(counts['Beg'])/max_correct,2),
-                  ',', np.round(np.mean(counts['End'])/max_correct,2),'% +/-',np.round(np.std(counts['End'])/max_correct,2))
+        norm={sac:100 for sac in results[numQ].keys()}
+        norm['rwd']=100/max_rwd
+        for sa_combo,counts in results[numQ].items():
+            print(sa_combo,':::',np.round(np.mean(counts['Beg'])*norm[sa_combo],2),'% +/-',np.round(np.std(counts['Beg'])*norm[sa_combo],2),
+                    ',', np.round(np.mean(counts['End'])*norm[sa_combo],2),'% +/-',np.round(np.std(counts['End'])*norm[sa_combo],2))
+        for i in range(params['numQ']):
+            acq.agent.visual(acq.agent.Q[i],labels=acq.state_to_words(i,noise,numchars),title='numQ='+str(numQ)+',Q'+str(i),state_subset=state_subset)
+        
         if save_data:
-            params['trials_per_block']=trials_per_block
-            params['trial_subset']=trial_subset
             import datetime
             dt=datetime.datetime.today()
             date=str(dt).split()[0]
+            #fname='Sequence'+date+'DecisionRule'+str(params['decision_rule'])+'_numQ'+str(params['numQ'])+\
             fname='Sequence'+date+'_HxLen'+str(Hx_len)+'_numQ'+str(params['numQ'])+'_alpha'+'_'.join([str(a) for a in params['alpha']])+\
-            '_st'+'_'.join([str(st) for st in params['state_thresh']])
-            params['max_correct']=max_correct
-            np.savez(fname,par=params,results=resultslist,traject=output_data[numQ],Qhx=Qhx)    
-    plot_trajectory(output_data,Hx_len,events_per_block,events_per_trial)
+            '_st'+'_'.join([str(st) for st in params['state_thresh']])+'_q2o'+str(params['Q2other'])+'beta'+str(params['beta_min'])+'split'+str(params['split'])
+            if params['inact']:
+                fname=fname +'_inactive'+params['inact']
+            np.savez(fname,par=params,results=resultslist[numQ],traject=output_data[numQ],Qhx=all_Qhx[numQ])
+            allQ={i:acq.agent.Q[i] for i in range(params['numQ'])}
+            all_labels={i:acq.state_to_words(i,noise,numchars) for i in range(params['numQ'])}
+            actions=acq.agent.actions
+    #
+    title='History Length '+str(Hx_len)+'\nminimum '+str(events_per_trial)+' actions per reward'
+    rlu.plot_trajectory(output_data,title,[Qvalues])
     if plot_Qhx:
         plot_states=[('Llever','RRLL'),('Rlever','LLLL'),('Rlever','RLLR'),('Rlever','RRLL')]
         from TD2Q_Qhx_graphs import plot_Qhx_sequence, plot_Qhx_sequence_1fig
