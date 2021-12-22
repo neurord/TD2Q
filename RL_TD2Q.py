@@ -21,12 +21,17 @@ class RL:
         self.agent = agent(self.env.actions,Aparams,oldQ)
         self.vis = True  # visualization
         self.name=None #will be named later
-            
-    def episode(self, tmax=50,noise=0,cues=[],info=False,name=None,block_DA=False):
-        self.name=name
+        self.results={'state': [], 'reward':[],'action':[]}
+
+    def episode(self, tmax=50,noise=0,cues=[],info=False,name=None,block_DA=False,action=None):
         state = self.env.start() #state tuple, (0,0) to start
-        self.results={'state': [state], 'reward':[0],'action':[0]} 
-        action = self.agent.start(state,cues) #1st action is random 
+        reward=0
+        if len(self.agent.Q): #if Q matrix exists, take a step
+            action = self.agent.step(reward, state, noise,cues=cues,prn_info=info)                            
+        else: #1st action is random
+            #print('starting from',self.env.state_from_number(state))
+            action = self.agent.start(state,cues) 
+        self.append_results(action,reward)
         # Repeat interaction
         if info:
             print('start episode, from Q=', self.agent.Q,'\nresults',self.results)
@@ -93,6 +98,7 @@ class RL:
     def count_state_action(self,allresults,sa_combo,event_subset):
         #2021 jan 4: added multiply rewared by self.agent.events_per_trial to get mean reward per trial
         #2021 mar: make events_per_Trial an agent parameter
+        #2021 dec: remove explicit state0num,state1num so it works with states of tuple length 1
         learn_phase=self.name
         actions=[]
         act_results={}
@@ -107,23 +113,24 @@ class RL:
             act_results[sa[1]]['End']=self.results['action'][-event_subset:].count(anum)/trial_subset
             #Now, count how many times that state=state and action=action
             state=sa[0]
-            state0num=self.env.states[self.env.state_types[0]][state[0]]
-            state1num=self.env.states[self.env.state_types[1]][state[1]]
+            #state0num=self.env.states[self.env.state_types[0]][state[0]]
+            #state1num=self.env.states[self.env.state_types[1]][state[1]]
+            statenum_list=[self.env.states[self.env.state_types[i]][state[i]] for i in range(len(state))]
             timeframe={'Beg':range(event_subset),'End':range(-event_subset,0)}
             for tf,trials in timeframe.items():
                 sa_count=0
                 for tr in trials:
                     #count number of times that agent state is state0 and state1
                     if self.results['action'][tr]==anum and \
-                        self.results['state'][tr]==(state0num,state1num):
+                        self.results['state'][tr]==tuple(statenum_list):#(state0num,state1num):
                             #print(sa,tf,self.results['action'][tr],self.results['state'][tr],sa_count)
                             sa_count+=1
-                allresults[learn_phase][sa][tf].append(sa_count/trial_subset)
+                allresults[learn_phase][sa][tf].append(sa_count/trial_subset)#events per trial
                 #print(learn_phase,sa,tf,trials,sa_count)
         result_str=' '.join([','+a+'= B:'+str(np.round(act_results[a]['Beg'],3))+
                              ',E:'+ str(np.round(act_results[a]['End'],3))
                              for a in np.unique(actions)])
-        allresults[learn_phase]['rwd']['Beg'].append(np.mean(self.results['reward'][0:event_subset])*self.agent.events_per_trial)             
+        allresults[learn_phase]['rwd']['Beg'].append(np.mean(self.results['reward'][0:event_subset])*self.agent.events_per_trial) #reward per trial            
         allresults[learn_phase]['rwd']['End'].append(np.mean(self.results['reward'][-event_subset:])*self.agent.events_per_trial)             
         return allresults,result_str  
 
@@ -138,14 +145,15 @@ class RL:
             else:    
                 anum=self.env.actions[sa[1]]
                 state=sa[0]
-                state0num=self.env.states[self.env.state_types[0]][state[0]]
-                state1num=self.env.states[self.env.state_types[1]][state[1]]
+                #state0num=self.env.states[self.env.state_types[0]][state[0]]
+                #state1num=self.env.states[self.env.state_types[1]][state[1]]
+                statenum_list=[self.env.states[self.env.state_types[i]][state[i]] for i in range(len(state))]
                 block_count=[]
                 for block in range(num_blocks):
                     sa_count=0
                     for tr in range(block*events_per_block,(block+1)*events_per_block):
                         if self.results['action'][tr]==anum and\
-                            self.results['state'][tr]==(state0num,state1num):
+                            self.results['state'][tr]==tuple(statenum_list):#(state0num,state1num):
                                 sa_count+=1
                     block_count.append(sa_count)
                 traject[phase][sa].append(block_count)
