@@ -102,8 +102,8 @@ def plot_Qhx_2D(Qhx,boundary,ept,phases,ideal_states=None,fig=None,ax=None):
                 leg_loc='center right'
                 ax[axnum].legend(handles,newlabels,loc=leg_loc,ncol=leg_cols,title='     '.join(leg_ttl),fontsize=fsizeSml,title_fontsize=fsizeSml,handletextpad=0.2,labelspacing=0.3,columnspacing=1)
             else:
-                #if row > 0:
-                ax[1].legend(loc='lower left',ncol=leg_cols,fontsize=fsizeSml)
+                if len(ax) > 1:
+                    ax[1].legend(loc='lower left',ncol=leg_cols,fontsize=fsizeSml)
             if isinstance(state,tuple) or isinstance(state,list):
                 ax[axnum].set_ylabel(','.join(list(state)),fontsize=fsizeSml+1)
             else:
@@ -151,9 +151,9 @@ def agent_response(runs,random_order,num_blocks,traject_dict,fig=None,ax=None):
             ax.vlines(k*num_blocks,0,10.1,linestyles='dashed')
         ax.set_xlim([0,len(left)])        
         ax.set_ylim([ylim[0],ylim[1]*1.1])
-        ax.legend(loc='center')
+        ax.legend()#loc='center')
     plt.show()
-    return 
+    return fig
 
 def plot_Qhx_sequence(Qhx,actions,ept,numQ):                                                        
     ### some states are practically zero, delete these from Qhx to be plotted
@@ -197,7 +197,7 @@ def plot_Qhx_sequence(Qhx,actions,ept,numQ):
                     ax[axnum].set_ylabel(press_hx)
                 ax[axnum].set_ylim([minQ,maxQ])
             ax[axnum].legend()
-            ax[axnum].set_xlabel('trial')
+            ax[axnum].set_xlabel('Trial')
     plt.show()
     return figures
 
@@ -235,11 +235,14 @@ def plot_Qhx_sequence_1fig(allQhx,plot_states,actions_colors,ept):
                             ax[axnum].set_ylabel(','.join(list(plot_states[row])))
                         ax[axnum].set_ylim([minQ,maxQ])
                         if row==len(plot_states)-1:
-                            ax[axnum].set_xlabel('trial')
-                label_inc=(1-blank)/numcols 
-                x=blank+(col*label_inc) #subtract because 0 is at bottom
-                fig.text(x,(1-blank),letters[col], fontsize=fsize)
-    axis[2][1].legend(loc='center right')
+                            ax[axnum].set_xlabel('Trial')
+    axis[1][1].legend(loc='upper right')
+    for col in range(numcols):
+        ylim=[axe.get_ylim() for axe in ax[col::3]]
+        ymin=np.min([a[0] for a in ylim])
+        ymax=np.max([a[1] for a in ylim])
+        for axe in ax[col::3]:
+            axe.set_ylim([ymin,ymax])
     plt.show()
     return fig
 
@@ -274,13 +277,13 @@ def staticQ_barplot(Q,actions,title='',labels=None,state_subset=None):
             cnum=a*color_increment
             axes[i].bar(np.arange(len(statenums))+(a-(Na-1)/2)*w, plotQ[:,a], w,color=colors.colors[cnum])  
         if labels is not None:
-            xticks=[' '.join(lbl[0:-1]) for lbl in xlabels]
+            xticks=[' '.join(lbl[0:2]) for lbl in xlabels]
         else:
             xticks=statenums
         axes[i].set_ylabel("Q"+str(i+1)+" value")
         axes[i].set_xticks(range(len(plotQ)),xticks)
     #axes[-1].set_xlabel("state")
-    axes[0].legend(list(actions.keys()),loc='upper right')
+    fig.legend(list(actions.keys()),bbox_to_anchor = (0.98, 0.98),ncol=2)#loc='upper right')
     for i in Q.keys():
         for ll in range(len(plotQ)-1):
             ylim=axes[i].get_ylim()
@@ -314,48 +317,63 @@ def combined_bandit_Qhx_response(random_order,num_blocks,traject_dict,Qhx,bounda
     fig.tight_layout()
     return fig
 
+def staticQ(f,figs,nQ):
+    data=np.load('staticQ'+f+'.npz',allow_pickle=True)
+    Q=data['allQ'].item()
+    labels=data['labels'].item()
+    state_subset=list(data['state_subset'])
+    actions=data['actions'].item()
+    figs[nQ]['static']=staticQ_barplot(Q,actions,title=str(nQ)+'Q',labels=labels,state_subset=state_subset)
+    return figs
+
+def add_labels(fig,numcols):
+    axes=fig.axes
+    for axnum,ax in enumerate(axes):
+        position=ax.get_position()
+        x=position.x0-0.06
+        y=position.y1
+        row=int(axnum/numcols)
+        col=axnum%numcols
+        fig.text(x,y,letters[col]+str(row+1), fontsize=fsize)
+    return
+
 if __name__ == "__main__":
-    '''
-    import glob
-    pattern='Sequence2021-07-26_HxLen4*.npz'
-    events_per_trial=7
-    files=glob.glob(pattern)
-    print('pattern',pattern,'files',files)
-    state_action_combos=[('Llever','RRLL'),('Rlever','LLLL'),('Rlever','RLLR'),('Rlever','RRLL')]
-    actions_colors={'goL':'r','goR':'b','press':'k','goMag':'grey'}
-    allQhx={}
-    for k,f in enumerate(files):
-        data=np.load(f,allow_pickle=True)
-        numQ=f.split('numQ')[-1][0]
-        allQhx[numQ]=data['Qhx'].item() 
-        #fig=plot_Qhx_sequence_1fig(allQhx[numQ],state_action_combos,actions_colors,events_per_trial) 
-    fig=plot_Qhx_sequence_1fig(allQhx,state_action_combos,actions_colors,events_per_trial)#Fig 8
-    '''
-    #fil={'1':'Discrim2021-12-13_numQ1_alpha0.3_0_st1.0_0', '2':'Discrim2021-12-13_numQ2_alpha0.2_0.1_st0.75_0.625'}
-    #fil={'2':'DiscrimD2AIP2021-12-13_numQ2_alpha0.2_0.1_st0.75_0.625'}
-    fil={'2':'Bandit2021-12-14_numQ2_alpha0.4_0.2beta0.89'} #'Bandit2021-12-14_numQ2_alpha0.4_0.2beta0.1'}
-    figs={q:{} for q in fil.keys()}
-    for nQ,f in fil.items():
-        data=np.load('Qhx'+f+'.npz',allow_pickle=True)
-        all_Qhx=data['all_Qhx'].item()
-        all_bounds=data['all_bounds'].item()
-        events_per_trial=data['events_per_trial'].item()
-        phases=[[p for p in phs] for phs in data['phases']]
-        all_ideals=data['all_ideals'].item()
-        if 'random_order' in data.keys():
-            phases=data['phases']
-            random_order=data['random_order']
-            num_blocks=data['num_blocks'].item()
-            data2=np.load(f+'.npz',allow_pickle=True)
-            traject_dict=data2['traject_dict'].item()
-            agent_response([0],random_order,num_blocks,traject_dict)
-            fig_combined=combined_bandit_Qhx_response(random_order,num_blocks,traject_dict,all_Qhx,all_bounds,events_per_trial,phases)
-        figs[nQ]['qhx']=plot_Qhx_2D(all_Qhx,all_bounds,events_per_trial,phases,all_ideals)
-        data=np.load('staticQ'+f+'.npz',allow_pickle=True)
-        Q=data['allQ'].item()
-        labels=data['labels'].item()
-        state_subset=list(data['state_subset'])
-        actions=data['actions'].item()
-        figs[nQ]['static']=staticQ_barplot(Q,actions,title=str(nQ)+'Q',labels=labels,state_subset=state_subset)
+    sequence=False
+    if sequence:
+        fil={'1':'Sequence2021-12-16_HxLen4_numQ1_alpha0.2_0_st0.75_0_q2o0.1beta0.9splitTrue','2':'Sequence2021-12-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue'}
+        figs={q:{} for q in fil.keys()}
+        events_per_trial=7
+        state_action_combos=[('Llever','RRLL'),('Rlever','LLLL'),('Rlever','RLLR'),('Rlever','RRLL')]
+        actions_colors={'goL':'r','goR':'b','press':'k','goMag':'grey'}
+        allQhx={}
+        for nQ,f in fil.items():
+            data=np.load(f+'.npz',allow_pickle=True)
+            allQhx[nQ]=data['Qhx'].item() 
+            #fig=plot_Qhx_sequence_1fig(allQhx[nQ],state_action_combos,actions_colors,events_per_trial)
+            #figs=staticQ(f,figs,nQ)
+        fig=plot_Qhx_sequence_1fig(allQhx,state_action_combos,actions_colors,events_per_trial)#Fig 8
 
 
+    else:
+        fil={'1':'Discrim2021-12-13_numQ1_alpha0.3_0_st1.0_0', '2':'Discrim2021-12-13_numQ2_alpha0.2_0.1_st0.75_0.625'}
+        #fil={'2':'DiscrimD2AIP2021-12-13_numQ2_alpha0.2_0.1_st0.75_0.625'}
+        #fil={'2':'Bandit2021-12-16_numQ2_alpha0.4_0.2_q2o0.1_beta0.9_splitTrue'} #'Bandit2021-12-14_numQ2_alpha0.4_0.2beta0.1'}
+        figs={q:{} for q in fil.keys()}
+        for nQ,f in fil.items():
+            data=np.load('Qhx'+f+'.npz',allow_pickle=True)
+            all_Qhx=data['all_Qhx'].item()
+            all_bounds=data['all_bounds'].item()
+            events_per_trial=data['events_per_trial'].item()
+            phases=[[p for p in phs] for phs in data['phases']]
+            all_ideals=data['all_ideals'].item()
+            if 'random_order' in data.keys(): #bandit task only
+                phases=data['phases']
+                random_order=data['random_order']
+                num_blocks=data['num_blocks'].item()
+                data2=np.load(f+'.npz',allow_pickle=True)
+                traject_dict=data2['traject_dict'].item()
+                agent_response([1],random_order,num_blocks,traject_dict)
+                fig_combined=combined_bandit_Qhx_response(random_order,num_blocks,traject_dict,all_Qhx,all_bounds,events_per_trial,phases)
+            else:
+                figs[nQ]['qhx']=plot_Qhx_2D(all_Qhx,all_bounds,events_per_trial,phases,all_ideals)
+                figs=staticQ(f,figs,nQ)
