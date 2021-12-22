@@ -163,7 +163,7 @@ discrim task reward output was mean reward.  Optimal performance is:
     Since mean was calculated over events (and not multiplied by 3 prior to Jan 3)
     optimal reward per trial is 8/3 prior to Jan 3 and 8 after Jan 3
 '''
-paradigm= 'discrim' #'sequence'  #'block_Da'# 'block_Da_b6' #'sequence' #'discrim_b6'#
+paradigm= 'sequence'  #'discrim' #'block_Da'# 'block_Da_b6' #'sequence' #'discrim_b6'#
 datadir='NormEuclid2021dec10/' # Euclid/discrimRuleNone/  # discrim/ # discrim_beta6/ # Euclid/sequenceRuleNone/ #
 min_param_combos=5  #keep lowering the percentiles until this many "best" parameter combinatins have been found
 HxLen='4' #only relevant for sequence task
@@ -173,7 +173,7 @@ block=False #blockDa is false unless otherwise specified
 
 if paradigm == 'sequence':
     Q1end='_Q1_all'#'_Q1*' if HxLen=='4' else '_Q1_all' #this was fur Guassian Mixture model
-    file_pattern={'Q1':datadir+'Sequence_paramsHxLen'+HxLen+Q1end,'Q2':datadir+'Sequence_HxLen'+HxLen+'_Q2*q2o0.05*_all'}
+    file_pattern={'Q1':datadir+'Sequence_paramsHxLen'+HxLen+Q1end,'Q2':datadir+'Sequence_HxLen'+HxLen+'_Q2*q2o0.2*_all'}
     phase_act=[] #if empty, will use key_combos from function
     rwd_column='rwd__End'
 else:
@@ -290,7 +290,7 @@ if paradigm=='sequence':# or max_rwd_event=='tot_rwd':
         stdkeys=[kc+'_STD' for kc in key_combos if kc+'_STD' in df.columns]
         found1=0
         for crit in np.arange(0.99,0.8,-0.01):
-            rwd_crit=df.quantile(crit)[rwd_column]
+            rwd_crit=df[rwd_column].quantile(crit)
             best=df.loc[(df[rwd_column] >= rwd_crit)]
             if len(best) and len(best)>found1:
                 found1=len(best)
