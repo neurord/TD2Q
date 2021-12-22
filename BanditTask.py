@@ -10,7 +10,7 @@ import agent_twoQtwoSsplit as QL
 from RL_TD2Q import RL
 from BanditTaskParam import params, env_params, states,act, Rbandit, Tbandit
 import RL_utils as rlu
-from DiscriminationTaskParam2 import loc, tone, rwd
+from BanditTaskParam import loc, tone, rwd
 
 def plot_prob_traject(data,params):
     p_choose_L={}
@@ -94,7 +94,7 @@ noise=0.15 #make noise small enough or state_thresh small enough to minimize new
 printR=False #print environment Reward matrix
 Info=False#print information for debugging
 plot_hist=0#1: plot final Q, 2: plot the time since last reward
-plot_Qhx=2 #2D or 3D plot of Q dynamics.  if 1, then plot agent responses
+plot_Qhx=0 #2D or 3D plot of Q dynamics.  if 1, then plot agent responses
 save_data=True
 
 action_items=[(('Pport','6kHz'),'left'),(('Pport','6kHz'),'right')]
@@ -115,10 +115,10 @@ params['numQ']=2
 params['events_per_trial']=events_per_trial
 params['wt_learning']=False
 params['distance']='Euclidean'
-params['beta_min']=0.1 #increased exploration after a mistake
-params['moving_avg_window']=3  #This in units of trials, the actual window is this times the number of events per trial
-params['decision_rule']=None
-params['split']=False
+params['beta_min']=0.1#params['beta'] #increased exploration after a mistake
+params['moving_avg_window']=1  #This in units of trials, the actual window is this times the number of events per trial
+params['decision_rule']=None#'delta'
+params['split']=True
 divide_rwd_by_prob=False
 non_rwd=rwd['base'] #rwd['base'] or rwd['error'] #### base is better
 
@@ -126,7 +126,7 @@ if params['distance']=='Euclidean':
     #state_thresh={'Q1':[0.875,0],'Q2':[0.875,0.75]} #For Euclidean distance
     #alpha={'Q1':[0.6,0],'Q2':[0.6,0.3]}    #For Euclidean distance
     state_thresh={'Q1':[1.0,0],'Q2':[0.75,0.625]} #For normalized Euclidean distance
-    alpha={'Q1':[0.6,0],'Q2':[0.4,0.2]}    #For normalized Euclidean distance, 2x discrim values
+    alpha={'Q1':[0.6,0],'Q2':[0.4,0.2]}    #For normalized Euclidean distance, 2x discrim values works with 100 trials
 
 else:
     state_thresh={'Q1':[0.22, 0.22],'Q2':[0.20, 0.22]} #For Gaussian Mixture?, 
@@ -140,20 +140,21 @@ traject_title='num Q: '+str(params['numQ'])+', beta:'+str(params['beta_min'])+':
 epochs=['Beg','End']
 
 keys=rlu.construct_key(action_items +['rwd'],epochs)
-allresults={phs:{k+'_'+ep:[] for k in keys.values() for ep in epochs} for phs in learn_phases}
 resultslist={phs:{k+'_'+ep:[] for k in keys.values() for ep in epochs} for phs in learn_phases}
-allresults['params']={p:[] for p in params.keys()} #to store list of parameters
-resultslist['params']={p:[] for p in params.keys()}
+traject_dict={phs:{ta:[] for ta in traject_items[phs]} for phs in learn_phases}
 
 #count number of responses to the following actions:
 results={phs:{a:{'Beg':[],'End':[]} for a in action_items+['rwd']} for phs in learn_phases}
 
 ### to plot performance vs trial block
-traject_dict={phs:{ta:[] for ta in traject_items[phs]} for phs in learn_phases}
 trials_per_block=10
 events_per_block=trials_per_block* events_per_trial
 num_blocks=int((numevents+1)/events_per_block)
 params['events_per_block']=events_per_block
+params['trials_per_block']=trials_per_block
+params['trial_subset']=trial_subset
+resultslist['params']={p:[] for p in params.keys()}
+
 random_order=[]
 key_list=list(prob_sets.keys())
 ######## Initiate dictionaries storing stay shift counts
@@ -161,7 +162,7 @@ all_counts={'left_rwd':{},'left_none':{},'right_rwd':{},'right_none':{}}
 for key,counts in all_counts.items():
     for phase in learn_phases:
         counts[phase]={'stay':[0]*runs,'shift':[0]*runs}
-
+wrong_actions={aaa:[0]*runs for aaa in ['wander','hold']}
 for r in range(runs):
     #randomize prob_sets
     acqQ={};acq={}
@@ -182,6 +183,8 @@ for r in range(runs):
 
         acq[phs] = RL(tone_discrim.completeT, QL.QL, states,act,Rbandit,Tbandit,params,env_params,printR=printR,oldQ=acqQ)
         results,acqQ=rlu.run_sims(acq[phs], phs,numevents,trial_subset,action_items,noise,Info,cues,r,results,phist=plot_hist)
+        for aaa in ['wander','hold']:
+            wrong_actions[aaa][r]+=acq[phs].results['action'].count(act[aaa])
         traject_dict=acq[phs].trajectory(traject_dict, traject_items,events_per_block)
         #print ('prob complete',acq.keys(), 'results',results[phs],'traject',traject_dict[phs])
     np.random.shuffle(key_list) #shuffle after run complete, so that first run does 50:50 first    
@@ -197,10 +200,9 @@ for phs in traject_dict.keys():
 all_ta=list(set(all_ta))
 #move reward to front
 all_ta.insert(0, all_ta.pop(all_ta.index('rwd')))
-for p in allresults['params'].keys():
-    allresults['params'][p].append(params[p])                #
+for p in resultslist['params'].keys():             #
     resultslist['params'][p].append(params[p])                #
-allresults,resultslist=rlu.save_results(results,epochs,allresults,keys,resultslist)
+resultslist=rlu.save_results(results,keys,resultslist)
 print('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%')
 print(' Using',params['numQ'], 'Q, alpha=',params['alpha'],'thresh',params['state_thresh'], 'beta=',params['beta'],'runs',runs,'of total events',numevents)
 print(' apply learning_weights:',[k+':'+str(params[k]) for k in params.keys() if k.startswith('wt')])
@@ -236,14 +238,14 @@ for phs in all_counts['left_rwd'].keys():
         ratio=[stay/(stay+shift) for stay,shift in zip(counts[phs]['stay'],counts[phs]['shift']) if stay+shift>0 ]
         events=[(stay+shift) for stay,shift in zip(counts[phs]['stay'],counts[phs]['shift'])]
         print(key,'mean stay=',round(np.mean(ratio),3),'+/-',round(np.std(ratio),3), 'out of', np.mean(events), 'events per trial')
+print('wrong actions',[(aaa,np.mean(wrong_actions[aaa])) for aaa in wrong_actions.keys()])
 if save_data:
-    params['trials_per_block']=trials_per_block
-    params['trial_subset']=trial_subset
     import datetime
     dt=datetime.datetime.today()
     date=str(dt).split()[0]
-    fname='Bandit'+date+'_numQ'+str(params['numQ'])+'_alpha'+'_'.join([str(a) for a in params['alpha']])+\
-    'beta'+str(params['beta_min'])+'splitFalse'
+    #fname='Bandit'+date+'DecisionRule'+str(params['decision_rule'])+'_numQ'+str(params['numQ'])\
+    fname='Bandit'+date+'_numQ'+str(params['numQ'])+'_alpha'+'_'.join([str(a) for a in params['alpha']])\
+    +'_q2o'+str(params['Q2other'])+'_beta'+str(params['beta_min'])+'_split'+str(params['split'])+'_window'+str(params['moving_avg_window'])
     #'_st'+'_'.join([str(st) for st in params['state_thresh']])
     np.savez(fname,par=params,results=resultslist,traject=output_data,traject_dict=traject_dict,shift_stay=all_counts)
 
