@@ -17,6 +17,7 @@ from scipy import linalg
 from scipy import spatial
 from RL_class import Agent
 from scipy.ndimage.filters import uniform_filter1d
+import copy
 
 def flatten(isiarray):
     return [item for sublist in isiarray for item in sublist]
@@ -31,8 +32,9 @@ class QL(Agent):
         #self.n_cues=len(cues)
         #each ideal_state = env state and zeros for other cues, 
         if len(oldQ):
-            import copy
-            print('********** starting from previous learning phase:',oldQ['name'],'rwd_prob',round(oldQ['rwd_prob'],4),'learn_weight',round(oldQ['learn_weight'],4))
+            print('********** starting from previous learning phase:',oldQ['name'])
+            if 'rwd_prob' in oldQ.keys():
+                print('rwd_prob',round(oldQ['rwd_prob'],4))#,'learn_weight',round(oldQ['learn_weight'],4))
             self.ideal_states=copy.deepcopy(oldQ['ideal_states'])
             print('init ideal states',[len(self.ideal_states[kk]) for kk in range(self.numQ)]
                   ,'::', [list(np.round(st,2))  for kk in range(self.numQ) for st in self.ideal_states[kk].values()])
@@ -43,42 +45,42 @@ class QL(Agent):
         nstate={kk:len(self.ideal_states[kk]) for kk in range(self.numQ)}
         super().__init__(nstate, naction)
         ############# default parameters
-        self.alpha = params['alpha']  # learning rate, no forgetting if alpha[1]=0, or using old rule 
-        self.beta_max = params['beta']  # inverse temperature
+        self.alpha = copy.copy(params['alpha'])  # learning rate, no forgetting if alpha[1]=0, or using old rule 
+        self.beta_max = copy.copy(params['beta'])  # inverse temperature
         if 'beta_min' in params.keys():
-            self.beta_min = params['beta_min']  #make this parameter.  If the same as params['beta'], beta doesn't vary
+            self.beta_min = copy.copy(params['beta_min'])  #make this parameter.  If the same as params['beta'], beta doesn't vary
         else:
-            self.beta_min=params['beta']
-        self.gamma = params['gamma']  # discount factor - future anticipated rewards worth 10% less per time unit
-        self.state_thresh=params['state_thresh']
-        self.time_increment=params['time_inc']
+            self.beta_min=copy.copy(params['beta'])
+        self.gamma = copy.copy(params['gamma'])  # discount factor - future anticipated rewards worth 10% less per time unit
+        self.state_thresh=copy.copy(params['state_thresh'])
+        self.time_increment=copy.copy(params['time_inc'])
         self.window=params['moving_avg_window']*params['events_per_trial']
-        self.sigma=params['sigma']
-        self.wt_noise=params['wt_noise']
-        self.wt_learning=params['wt_learning']
+        self.sigma=copy.copy(params['sigma'])
+        self.wt_noise=copy.copy(params['wt_noise'])
+        self.wt_learning=copy.copy(params['wt_learning'])
         self.learn_weight=1 #initialize learning rate to 1
         self.prior_rwd_prob=None
         self.min_learn_weight=0.1
-        self.events_per_trial=params['events_per_trial']
+        self.events_per_trial=copy.copy(params['events_per_trial'])
         self.distance=params['distance']
         if 'Q2other' in params.keys():
-            self.wt_Q2other=params['Q2other']
+            self.wt_Q2other=copy.copy(params['Q2other'])
         else:
             self.wt_Q2other=1
         if 'decision_rule' in params.keys():
-            self.decision_rule=params['decision_rule']
+            self.decision_rule=copy.copy(params['decision_rule'])
         else:
             self.decision_rule=None
         if 'split' in params.keys():
-            self.split=params['split']
+            self.split=copy.copy(params['split'])
         else:
             self.split=True
         if 'forgetting' in params.keys():
-            self.forgetting=params['forgetting']
+            self.forgetting=copy.copy(params['forgetting'])
         else:
             self.forgetting=0
         if 'reward_cues' in params.keys():
-            self.reward_cues=params['reward_cues']
+            self.reward_cues=copy.copy(params['reward_cues'])
         else:
             self.rewared_cues=None
         if 'state_units' in params:
@@ -497,20 +499,21 @@ class QL(Agent):
             statenums=[ks[0] for ks in keep_state]
         else:
             plotQ=np.array(newQ)
-        w = 1./(self.Na+0.5) # bar width
-        for a in range(self.Na):
-            cnum=a*color_increment
-            plt.bar(np.arange(len(statenums))+(a-(self.Na-1)/2)*w, plotQ[:,a], w,color=colors.colors[cnum])  
-        plt.xticks(range(len(plotQ)),statenums)
-        plt.xlabel("state"); plt.ylabel("Q")
-        plt.legend(list(self.actions.keys()))
-        #make vertical grid - between groups of bars
-        for ll in range(len(plotQ)-1):
-            plt.vlines(ll+0.5,np.min(plotQ),np.max(plotQ),'grey',linestyles='dashed')
-        if labels is not None:
-            for ii,l in enumerate(xlabels):
-                plt.annotate(' '.join(l), (ii-0.5, np.min(plotQ)-0.05*(ii%2)*(np.max(plotQ)-np.min(plotQ))))
-        plt.show()
+        if len(plotQ):
+            w = 1./(self.Na+0.5) # bar width
+            for a in range(self.Na):
+                cnum=a*color_increment
+                plt.bar(np.arange(len(statenums))+(a-(self.Na-1)/2)*w, plotQ[:,a], w,color=colors.colors[cnum])  
+            plt.xticks(range(len(plotQ)),statenums)
+            plt.xlabel("state"); plt.ylabel("Q")
+            plt.legend(list(self.actions.keys()))
+            #make vertical grid - between groups of bars
+            for ll in range(len(plotQ)-1):
+                plt.vlines(ll+0.5,np.min(plotQ),np.max(plotQ),'grey',linestyles='dashed')
+            if labels is not None:
+                for ii,l in enumerate(xlabels):
+                    plt.annotate(' '.join(l), (ii-0.5, np.min(plotQ)-0.05*(ii%2)*(np.max(plotQ)-np.min(plotQ))))
+            plt.show()
     
     def plot_learn_history(self,title=''):
         import matplotlib.pyplot as plt
