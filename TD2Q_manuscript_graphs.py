@@ -19,7 +19,7 @@ letters=['A','B','C','D','E']
 fsize=12
 
     
-def create_traject_fig(traject,phases,actions,action_text,leg_panel=0, leg_loc='best',leg_fs=fsize,sequential=False):
+def create_traject_fig(traject,phases,actions,action_text,leg_panel=0, leg_loc='best',leg_fs=fsize,sequential=False,leg_text={}):
     fig,ax=plt.subplots(len(actions),1,sharex=True)
     ax=fig.axes
     color_inc=int((255-color_offset)/(len(traject.keys())))
@@ -43,10 +43,14 @@ def create_traject_fig(traject,phases,actions,action_text,leg_panel=0, leg_loc='
             ########## Text for legend ###########
             if len(phases)>len(colors):
                trace_label=phase
+               if len(leg_text):
+                   trace_label=leg_text[phase]
                legend_title=''.join([numQ+'Q               ' for numQ in traject.keys()])
                #leg_fs=10
             elif len(phases)>1:
                 trace_label=phase
+                if len(leg_text):
+                   trace_label=leg_text[phase]
                 if numQ.isdigit(): #don't add 'numQ=' if traject.keys() are not numQ
                     legend_title='      '.join(['numQ='+str(numQ) for numQ in traject.keys()])
                 else:
@@ -94,8 +98,9 @@ def create_sequence_traject_fig(traject,actions,action_text):
     fig,ax=plt.subplots(len(actions),1,sharex=True)
     ax=fig.axes
     blank=0.03
-    for numQ,data in traject.items():
-        color=colors[0].__call__(int(numQ)*127)
+    for ijk,(numQ,data) in enumerate(traject.items()):
+        incr=int(255/len(traject.keys()))
+        color=colors[0].__call__((ijk+1)*incr)
         label_inc=(1-2*blank)/len(actions) #used for putting subplot labels
         ########## Text for legend ###########
         for anum,act in enumerate(actions):
@@ -109,7 +114,7 @@ def create_sequence_traject_fig(traject,actions,action_text):
             if len(actions)>1:
                 fig.text(0.02,y,letters[anum], fontsize=fsize)
         ax[anum].set_xlim([0,num_blocks])
-        ax[anum].set_xlabel('block', fontsize=fsize)
+        ax[anum].set_xlabel('Block', fontsize=fsize)
         ax[0].legend(frameon=True,title='num Q')
     plt.show()
     return fig #so you can adjust size and then do fig.tight_layout()
@@ -144,7 +149,7 @@ def create_bandit_fig(traject, numpanels=2):
             fig.text(0.02,y,letters[nQ], fontsize=fsize)
     if numpanels==1:
         ax[0].legend(frameon=True,title=leg_text,ncol=len(traject.keys()), fontsize=fsize-1,title_fontsize=fsize-1,handletextpad=0.2,labelspacing=0.3,columnspacing=1)
-    ax[axnum].set_xlim([0,num_blocks])
+    ax[axnum].set_xlim([0,num_blocks+1])
     ax[axnum].set_xlabel('Block', fontsize=fsize)
     plt.show()
     return fig #so you can adjust size and then do fig.tight_layout()
@@ -168,8 +173,9 @@ def read_data(pattern, files=None, keys=None):
     return traject,all_counts
   
 ################## Stat Analysis  #########################
-def create_df(pattern,del_variables=[],params=['numQ']):
-    files=glob.glob(pattern)
+def create_df(pattern,files=None,del_variables=[],params=['numQ']):
+    if not files:
+        files=glob.glob(pattern)
     print('pattern',pattern,'files',files)
     df=[]
     for f in files:
@@ -177,8 +183,12 @@ def create_df(pattern,del_variables=[],params=['numQ']):
         data=np.load(f,allow_pickle=True)
         print(f,list(data.keys()))
         results=data['results'].item()
+        print('params',results['params'])
         for p in params:
-            par[p]=results['params'][p][0]
+            if p in results['params'].keys():
+                par[p]=results['params'][p][0]
+            else:
+                par[p]=-1
             #numQ=str(results['params']['numQ'][0])
         del results['params']
         key_combos=list(results.keys())
@@ -194,7 +204,8 @@ def create_df(pattern,del_variables=[],params=['numQ']):
         elif len(np.shape(results[key_combos[0]]))==2:
             new_results={}
             for phs in key_combos:
-                new_results[phs]=results[phs][0]
+                new_key=phs.replace('*','x')
+                new_results[new_key]=results[phs][0]
             for zr in del_variables:
                 del new_results[zr]
             results=new_results
@@ -208,37 +219,69 @@ def create_df(pattern,del_variables=[],params=['numQ']):
     alldf=pd.concat(df).reset_index() #concatentate everything into big dictionary
     return alldf
 
+def barplot(mean,sterr,rows,variables,varname):
+    figS,ax=plt.subplots()
+    xlabels=['Ctrl' if x==-1 else varname+' '+str(x) for x in rows]
+    xvalues=np.arange(len(rows))
+    w = 1./(len(variables)+0.5)
+    for a,tv in enumerate(variables):
+        yvalues=mean[tv].values
+        yerr=sterr[tv].values
+        ax.bar(xvalues+(a-(len(variables)-1)/2)*w, yvalues,width=w,yerr=yerr,label=tv) 
+    ax.set_ylabel('Reward')
+    ax.hlines(0,np.min(xvalues),np.max(xvalues),linestyles='dashed',colors='gray')
+    ax.set_xlabel('Condition')
+    ax.set_xticks(xvalues,xlabels)
+    ax.legend()
+    return figS
+
+
 if __name__ == "__main__":
-    discrim=1
-    sequence=0
+    discrim=0
+    sequence=1
     block_da=0
     bandit=0
+    files=None
     ######################### DISCRIM #########################
     if discrim:
         pattern='Discrim2021-12-13_numQ?_alpha*.npz'
-        traject,_=read_data(pattern) 
+        dep_var=['numQ', 'split','beta_min']#,'Q2other'] #'decision_rule']##'trial_subset']# 
+        files=['Discrim2021-12-17_numQ2_alpha0.2_0.1_st0.75_0.625_q2o0.1_beta0.9_splitTrue.npz',
+                'Discrim2021-12-14_numQ2_alpha0.2_0.1_st0.75_0.625_q2o0.1_beta0.5_splitFalse.npz',
+                'Discrim2021-12-13_numQ2_alpha0.2_0.1_st0.75_0.625_q2o0.1_beta0.5_splitTrue.npz'] 
+                #'Discrim2021-12-13_numQ1_alpha0.3_0_st1.0_0_q2o0.1_beta0.5_splitTrue.npz',
+                #'Discrim2021-12-17_numQ1_alpha0.3_0_st1.0_0_q2o0.1_beta0.9_splitTrue.npz',#Test split, beta_min
+                #
+                #
+                #'Discrim2021-12-17_numQ1_alpha0.3_0_st1.0_0_q2o0.1_beta0.5_splitFalse.npz',
+                #'Discrim2021-12-16_numQ2_alpha0.2_0.1_st0.75_0.625_q2o0_beta0.5_splitTrue.npz', #test Q2other
+                #'Discrim2021-12-17_numQ1_alpha0.3_0_st1.0_0_q2o0_beta0.5_splitTrue.npz']
+                #'Discrim2021-12-17_numQ2_alpha0.2_0.1_st0.75_0.625_q2o0.1_beta0.5_splitTrue_ruleDelta.npz', #test decision rule
+                #'Discrim2021-12-17_numQ1_alpha0.3_0_st1.0_0_q2o0.1_beta0.5_splitTrue_ruleDelta.npz']
+        traject,_=read_data(pattern,files=files) 
         ##### acquisition ######
         phase=['acquire']
         actions=['rwd',(('Pport', '6kHz'),'left')]
         action_text=['reward','6 kHz Left']
-        figA=create_traject_fig(traject,phase,actions,action_text) #Fig 2A,B
+        #figA=create_traject_fig(traject,phase,actions,action_text) #Fig 2A,B
                 
         ##### extinction, renewal #####
         phase=['extinc','renew']
         actions=[(('Pport', '6kHz'),'left')]
         action_text=['6 kHz Left']
-        figE=create_traject_fig(traject,phase,actions,action_text) #Fig 2C
+        phase_text={'extinc':'Context B','renew':'Context A'}
+        #figE=create_traject_fig(traject,phase,actions,action_text,leg_text=phase_text) #Fig 2C
         
         ##### discrimination, reversal #####
         phase=['discrim','reverse']
         actions=['rwd',(('Pport', '6kHz'),'left'), (('Pport', '10kHz'),'right')]#(('Pport', '10kHz'),'left'),
         action_text=['reward','6 kHz Left', '10 kHz Right'] #
-        figD=create_traject_fig(traject,phase,actions,action_text,leg_panel=1, sequential=True) #Fig 4
+        #figD=create_traject_fig(traject,phase,actions,action_text,leg_panel=1, sequential=True) #Fig 4
     
     ######################### block Dopamine #########################
     if block_da:
         pattern='DiscrimD2AIP*.npz'
-        files=['DiscrimD2AIP2021-12-13_numQ2_alpha0.2_0.1_st0.75_0.625.npz','Discrim2021-12-13_numQ2_alpha0.2_0.1_st0.75_0.625.npz']
+        files=['DiscrimD2AIP2021-12-13_numQ2_alpha0.2_0.1_st0.75_0.625.npz','Discrim2021-12-13_numQ2_alpha0.2_0.1_st0.75_0.625_q2o0.1_beta0.5_splitTrue.npz']
         keys=['block', 'ctrl']
         traject,_=read_data(pattern, files, keys) 
         phase=['acquire','discrim']
@@ -253,28 +296,82 @@ if __name__ == "__main__":
         ax[2].set_ylim([-0.3,8]) 
     #################### Sequence trajectory ##################
     if sequence:
-        pattern='Sequence2021-07*.npz'
-        traject,_=read_data(pattern) 
+        pattern='Sequence2021-12-12_*_inact*.npz'
+        add_barplot=1
+        dep_var=['inact']#'numQ']#'split','beta_min']#, 'Q2other','split','beta_min'] #'trial_subset']# 'decision_rule']#
+        files=['Sequence2021-12-16_HxLen4_numQ1_alpha0.2_0_st0.75_0_q2o0.1beta0.9splitTrue.npz','Sequence2021-12-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue.npz']
+        files=[ 'Sequence2021-12-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue.npz',
+                'Sequence2021-12-22_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue_inactiveD1.npz',
+                'Sequence2021-12-22_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue_inactiveD2.npz']
+        keys=['Ctrl','inactiveD1','inactiveD2']#
+        '''
+
+        files=['Sequence2021-12-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitFalse.npz',
+                'Sequence2021-12-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue.npz',
+                'Sequence2021-12-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.5splitTrue.npz']
+                #'Sequence2021-12-16_HxLen4_numQ1_alpha0.2_0_st0.75_0_q2o0.1beta0.9splitTrue.npz',
+                #'Sequence2021-12-17DecisionRuledelta_numQ2.npz', #test delta rule
+                #'Sequence2021-12-17DecisionRuledelta_numQ1.npz']
+        #Additional files for testing effect of state_splitting, beta_min, Q2other
+
+        files=['Sequence2021-12-16_HxLen4_numQ1_alpha0.2_0_st0.75_0_q2o0.0beta0.5splitTrue.npz',
+                'Sequence2021-12-16_HxLen4_numQ1_alpha0.2_0_st0.75_0_q2o0.0beta0.9splitTrue.npz',
+                'Sequence2021-12-16_HxLen4_numQ1_alpha0.2_0_st0.75_0_q2o0.1beta0.5splitTrue.npz',
+                'Sequence2021-12-16_HxLen4_numQ1_alpha0.2_0_st0.75_0_q2o0.1beta0.9splitTrue.npz',
+                'Sequence2021-12-16_HxLen4_numQ2_alpha0.2_0.25_st0.75_0.75_q2o0.0beta0.5splitTrue.npz',
+ 
+                'Sequence2021-12-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.5splitTrue.npz',
+                'Sequence2021-12-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue.npz',
+                'Sequence2021-12-16_HxLen4_numQ1_alpha0.2_0_st0.75_0_q2o0.1beta0.9splitFalse.npz',
+                'Sequence2021-12-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitFalse.npz',]
+        files=['Sequence2021-12-16_HxLen4_numQ1_alpha0.2_0_st0.75_0_q2o0.1beta0.9splitFalse.npz',
+                'Sequence2021-12-16_HxLen4_numQ1_alpha0.2_0_st0.75_0_q2o0.1beta0.9splitTrue.npz',
+                'Sequence2021-12-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitFalse.npz',
+                'Sequence2021-12-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue.npz']
+         '''       
+
+        traject,_=read_data(pattern,files)#,keys) 
         actions=['rwd',(('Llever', '**LL'), 'goR'), (('Rlever', '*LLR'), 'press')]
         action_text=['reward', '**LL, go Right','*LLR press R']
         figS=create_sequence_traject_fig(traject,actions,action_text) #fig 7
     
     #################### Bandit Task Probabilities ##################
     if bandit:
-        pattern='Bandit2021-12-14_numQ*_alpha*beta*.npz'#'Bandit2021-05-28*beta0.1.npz'#'Bandit2021-05-28_numQ2_alpha0.6_0.3_beta0.7.npz'#
-        traject,shift_stay=read_data(pattern)
+        pattern='Bandit2021-12-14_numQ*_alpha*beta0.1.npz'#'Bandit2021-05-28*beta0.1.npz'#'Bandit2021-05-28_numQ2_alpha0.6_0.3_beta0.7.npz'#
+        dep_var=['split','beta_min'] #'numQ']#,'Q2other', 'decision_rule']#'trial_subset']# 
+        files=[ 'Bandit2021-12-16_numQ2_alpha0.4_0.2_q2o0.1_beta0.9_splitTrue.npz',
+                'Bandit2021-12-16_numQ2_alpha0.4_0.2_q2o0.1_beta0.1_splitFalse.npz',
+                'Bandit2021-12-16_numQ2_alpha0.4_0.2_q2o0.0_beta0.1_splitTrue.npz']
+                #'Bandit2021-12-21_numQ2_alpha0.4_0.2_q2o0.1_beta0.1_splitTrue_window1.npz']
+                #'Bandit2021-12-14_numQ1_alpha0.6_0_q2o0.1_beta0.1splitTrue.npz']
+                 # #next four to test beta and split
+                #'Bandit2021-12-16_numQ1_alpha0.6_0_q2o0.1_beta0.9_splitTrue.npz']
+                #'Bandit2021-12-16_numQ2_alpha0.4_0.2_q2o0.1_beta0.9_splitTrue.npz', #next four to test beta and split
+                #'Bandit2021-12-16_numQ1_alpha0.6_0_q2o0.1_beta0.9_splitTrue.npz',
+                #'Bandit2021-12-16_numQ1_alpha0.6_0_q2o0.1_beta0.1_splitFalse.npz',
+                #'Bandit2021-12-16_numQ2_alpha0.4_0.2_q2o0.1_beta0.1_splitFalse.npz',
+                #'Bandit2021-12-16_numQ2_alpha0.4_0.2_q2o0.0_beta0.1_splitTrue.npz',  #to test q2o (Q2other)
+                #'Bandit2021-12-16_numQ1_alpha0.6_0_q2o0.0_beta0.1_splitTrue.npz']
+                #'Bandit2021-12-16_numQ1_alpha0.3_0_q2o0.1_beta0.1_splitTrue.npz', #to test number of trials (trial_subset)
+                #'Bandit2021-12-16_numQ2_alpha0.2_0.1_q2o0.1_beta0.1_splitTrue.npz'] 
+                #'Bandit2021-12-17DecisionRuledelta_numQ2_q2o0.1_beta0.1_splitTrue.npz', #to test decision rule
+                #'Bandit2021-12-17DecisionRuledelta_numQ1_q2o0.1_beta0.1_splitTrue.npz']
+
+
+        traject,shift_stay=read_data(pattern,files=files)
         p_choose_L={q:{} for q in traject.keys()}
         for numQ, data in traject.items():
             tmp_prob={}
             for prob in data.keys():
                 tmp_prob[prob]=data[prob][(('Pport', '6kHz'), 'left')]['mean']/(data[prob][(('Pport', '6kHz'), 'left')]['mean']+data[prob][(('Pport', '6kHz'), 'right')]['mean'])
             p_choose_L[numQ]=dict(sorted(tmp_prob.items(),key=lambda item: float(item[0].split(':')[0])-float(item[0].split(':')[1]),reverse=True))
-        figB=create_bandit_fig(p_choose_L,numpanels=2) #Fig 10A,B
+        #figB=create_bandit_fig(p_choose_L,numpanels=2) #Fig 10A,B
         actions=[(('Pport', '6kHz'),'left'), (('Pport', '6kHz'),'right')]
         action_text=['6 kHz Left','6 kHz Right']
         tmp_phs=list(traject['2'].keys())
         phases=sorted(tmp_phs,key=lambda tmp_phs: float(tmp_phs.split(':')[0])-float(tmp_phs.split(':')[1]),reverse=True)
-        figBT=create_traject_fig(traject,phases,actions,action_text,leg_fs=0) #Fig 10C,D
+        #figBT=create_traject_fig(traject,phases,actions,action_text,leg_fs=0) #Fig 10C,D
+        '''
         for numQ,all_counts in shift_stay.items():
             print('\n ############################ numQ=',numQ)
             for phs in all_counts['left_rwd'].keys():
@@ -285,11 +382,12 @@ if __name__ == "__main__":
                     ratio=[stay/(stay+shift) for stay,shift in zip(counts[phs]['stay'],counts[phs]['shift']) if stay+shift>0 ]
                     events=[(stay+shift) for stay,shift in zip(counts[phs]['stay'],counts[phs]['shift'])]
                     print(key,round(np.mean(ratio),3),round(np.std(ratio),3), 'out of', np.mean(events), 'responses')
-    
+        '''
     import pandas as pd
     from scipy.stats import ttest_ind
     import statsmodels.api as sm
     from statsmodels.formula.api import ols
+    import scikit_posthocs as sp
     
     ########### Discrim ###########
     if discrim or block_da:
@@ -297,36 +395,54 @@ if __name__ == "__main__":
                         'renew_Pport_10kHz_left_Beg', 'renew_Pport_10kHz_left_End', 'renew_Pport_10kHz_right_Beg', 'renew_Pport_10kHz_right_End',
                         'acquire_Pport_10kHz_left_Beg', 'acquire_Pport_10kHz_left_End', 'acquire_Pport_10kHz_right_Beg', 'acquire_Pport_10kHz_right_End']
         
-        test_variables=['acquire_rwd__End','discrim_rwd__End','reverse_rwd__End', 
-                        'discrim_Pport_6kHz_left_End','discrim_Pport_10kHz_right_End',
-                        'reverse_Pport_6kHz_right_End','reverse_Pport_10kHz_left_End',]
+        test_variables=['acquire_rwd__End','discrim_rwd__End','reverse_rwd__End'] 
+        #test_variables=['renew_Pport_6kHz_left_Beg', 'extinc_Pport_6kHz_left_Beg']
+                        #'discrim_Pport_6kHz_left_End','discrim_Pport_10kHz_right_End',
+                        #'reverse_Pport_6kHz_right_End','reverse_Pport_10kHz_left_End',]
         ########## Sequence ##########
     if sequence:
-        #pattern='Sequence*.npz'
-        test_variables=['rwd__End','*_**LL_goR_End', 'Rlever_*LLR_press_End']
+        test_variables=['rwd__End']#,'Llever_**LL_goR_End'.replace('*','x'), 'Rlever_*LLR_press_End'.replace('*','x'),'Rlever_xxLL_press_End','Rlever_LLRR_goMag_End']
    
     ########## bandit ##########
     if bandit:
         test_variables=[k+'_rwd__End' for k in ['50:50','10:50','10:90','50:90','90:10','90:50','50:10']]
 
-    dep_var=['numQ','beta_min']
-    df=create_df(pattern,params=dep_var)
+    df=create_df(pattern,files=files,params=dep_var)
+    for dv in dep_var:
+        df[dv].fillna(-1,inplace=True)
     if pattern.startswith('Bandit'):
-        df['total_reward']=df.loc[:,test_variables].sum(axis=1)
-        test_variables=['total_reward']
-    
+        for prob in traject['2'].keys():
+            df[prob+'_probL']=df[prob+'_Pport_6kHz_left_End']/(df[prob+'_Pport_6kHz_left_End']+df[prob+'_Pport_6kHz_right_End'])
+        df['mean_reward']=df.loc[:,test_variables].mean(axis=1)
+        test_variables=['mean_reward']
+    if pattern.startswith('Discrim'):
+        df['mean_reward']=df.loc[:,['reverse_rwd__End','discrim_rwd__End']].mean(axis=1)
+        test_variables=['mean_reward']
     print(df.groupby(dep_var)[test_variables].aggregate(['mean','std','count']))
     mean=df.groupby(dep_var)[test_variables].mean()
-    std=df.groupby(dep_var)[test_variables].std()
     cnt=df.groupby(dep_var)[test_variables].count()
+    sterr=df.groupby(dep_var)[test_variables].std()/np.sqrt(cnt-1)
     textname=pattern.replace('?','x').replace('*','all_').split('.npz')[0]+'summary.txt'
     columns=[tv[0:-4] for tv in test_variables]
     header=' '.join(cnt.index.names)+' '+'  '.join(columns)
     rows=list(cnt.index.values)
-    #np.savetxt(textname,np.column_stack((rows*3,np.vstack([cnt,mean,std]))),fmt='%4.3f',header=header,comments='') #Ttest tables/Fig 5 - Igor
-    
+    np.savetxt(textname,np.column_stack((rows*3,np.vstack([cnt,round(mean,3),round(sterr,3)]))),fmt='%s',header=header,comments='') #Ttest tables/Fig 5 - Igor
+    if bandit:
+        newtv= [k+'_probL' for k in ['90:10','90:50','50:10', '50:50','10:50','50:90','10:90']] 
+        print(df.groupby(dep_var)[newtv].mean())
+    if sequence and add_barplot:
+        figBP=barplot(mean,sterr,rows,test_variables,dep_var[0])
     for tv in test_variables:
-        if len(np.unique(df[dep_var]))==2:
+        new_dep_var=[]
+        for dv in dep_var:
+            if df[dv].nunique()>1:
+                new_dep_var.append(dv)
+            else:
+                print('STATS: only 1 level for variable=', dv)
+        if len(dep_var)>len(new_dep_var):
+            print('proposed dependent variables:',dep_var,', new dependent variables:',new_dep_var)
+        dep_var=new_dep_var
+        if df[dep_var].nunique().sum()==2:
             unique_vals=np.unique(df[dep_var[0]])
             tt=ttest_ind(df[df[dep_var[0]]==unique_vals[0]][tv], df[df[dep_var[0]]==unique_vals[1]][tv], equal_var=False)
             print('\n*******',tv,'\n',tt)      
@@ -336,4 +452,5 @@ if __name__ == "__main__":
             print(model_statement)
             model=ols(tv+model_statement,data=df).fit()
             print (tv, sm.stats.anova_lm (model, typ=2), '\n',model.summary())
+            sp.posthoc_ttest(df, val_col='rwd__End', group_col='inact', p_adjust='holm')
     
