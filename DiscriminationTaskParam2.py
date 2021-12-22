@@ -63,7 +63,7 @@ env_params={'start':start}
 loc=states['loc'] #used only to define R and T
 tone=states['tone'] #used only to define R and T
 move=['left','right','wander','center']
-stay=['groom','lick','hold']
+stay=['groom','other','hold']
 
 Racq={};Tacq={}  #dictionaries to improve readability/prevent mistakes
 ####value of T dict is the new state

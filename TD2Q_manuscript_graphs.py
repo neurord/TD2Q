@@ -452,5 +452,6 @@ if __name__ == "__main__":
             print(model_statement)
             model=ols(tv+model_statement,data=df).fit()
             print (tv, sm.stats.anova_lm (model, typ=2), '\n',model.summary())
-            sp.posthoc_ttest(df, val_col='rwd__End', group_col='inact', p_adjust='holm')
+            if len(dep_var)==1: 
+                print('post-hoc',sp.posthoc_ttest(df, val_col='rwd__End', group_col=dep_var[0], p_adjust='holm'))
     
