@@ -184,7 +184,7 @@ class QL(Agent):
         #start by selecting state and action from Q[0]
         #Note, state is list - one state for each Q
         self.state=[self.ideal_states[kk][self.state_num[kk]] for kk in range(self.numQ)]
-        self.action,actp = self.boltzmann( self.Q[0][self.state_num[0],:])
+        self.choose_act()#self.boltzmann( self.Q[0][self.state_num[0],:])
         print('>>>>> agent start: state=',self.state,self.state_num,', action=',self.action)
         # remember the state
         return self.action

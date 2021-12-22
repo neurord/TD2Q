@@ -23,14 +23,11 @@ class RL:
         self.name=None #will be named later
         self.results={'state': [], 'reward':[],'action':[]}
 
-    def episode(self, tmax=50,noise=0,cues=[],info=False,name=None,block_DA=False,action=None):
+    def episode(self, tmax=50,noise=0,cues=[],info=False,name=None,block_DA=False):
         state = self.env.start() #state tuple, (0,0) to start
+        self.name=name
         reward=0
-        if len(self.agent.Q): #if Q matrix exists, take a step
-            action = self.agent.step(reward, state, noise,cues=cues,prn_info=info)                            
-        else: #1st action is random
-            #print('starting from',self.env.state_from_number(state))
-            action = self.agent.start(state,cues) 
+        action = self.agent.start(state,cues) #1st action is random unless using old Q matrix
         self.append_results(action,reward)
         # Repeat interaction
         if info:
