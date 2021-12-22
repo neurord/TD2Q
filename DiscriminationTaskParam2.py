@@ -51,7 +51,7 @@ def validate_R(T,R,msg=''):
                     print('state/action:', st,a,'in T, but not in R')
    
 ######### Parameters for the environment ##################################
-act={'center':0,'left':1,'return':2,'right':3,'wander':4,'hold':5,'groom':6,'lick':7} 
+act={'center':0,'left':1,'return':2,'right':3,'wander':4,'hold':5,'groom':6,'other':7} 
 
 states={'loc':{'start':0,'Pport':2,'Lport':1,'other':4,'Rport':3},
         'tone':{'blip':0,'6kHz':6,'success':2,'error':-2,'10kHz':10}} #These values need units

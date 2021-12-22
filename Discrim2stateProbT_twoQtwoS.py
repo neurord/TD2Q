@@ -99,13 +99,13 @@ if __name__ == "__main__":
     trial_subset=int(0.1*numevents) #display mean reward and count actions over 1st and last of these number of trials 
     from DiscriminationTaskParam2 import params,states,act
     #update some parameters of the agent
-    params['decision_rule']=None#'combo', 'delta', 'sumQ2', None means use direct negative of D1 rule
+    params['decision_rule']=None#'delta' #'delta' #'combo', , 'sumQ2', None means use direct negative of D1 rule
     params['Q2other']=0.1  
     params['numQ']=2
     params['events_per_trial']=events_per_trial
     params['wt_learning']=False
     params['distance']='Euclidean'
-    params['beta_min']=0.5 #params['beta'] #
+    params['beta_min']=0.5#params['beta'] #
     params['state_units']['context']=False
     if params['distance']=='Euclidean':
         #state_thresh={'Q1':[0.875,0],'Q2':[0.875,1.0]} #For Euclidean distance
@@ -119,7 +119,7 @@ if __name__ == "__main__":
     params['state_thresh']=state_thresh['Q'+str(params['numQ'])] #for euclidean distance, no noise
     #lower means more states for Euclidean distance rule
     params['alpha']=alpha['Q'+str(params['numQ'])] #  
-    params['split']=False#if False - initialize new row in Q matrix to 0; if True - initialize to Q values of best matching state   
+    params['split']=True #if False - initialize new row in Q matrix to 0; if True - initialize to Q values of best matching state   
     traject_title='num Q: '+str(params['numQ'])+' rule:'+str( params['decision_rule'])+' forget:'+str(params['forgetting'])
 
     from DiscriminationTaskParam2 import Racq,Tacq,env_params
@@ -130,19 +130,20 @@ if __name__ == "__main__":
         from DiscriminationTaskParam2 import loc, tone, rwd
         Racq[(loc['Pport'],tone['6kHz'])][act['left']]=[(rwd['reward'],PREE),(rwd['base'],1-PREE)]   #lick in left port - 90% reward   
     keys=rlu.construct_key(action_items +['rwd'],epochs)
-    allresults={phs:{k+'_'+ep:[] for k in keys.values() for ep in epochs} for phs in learn_phases}
     resultslist={phs:{k+'_'+ep:[] for k in keys.values() for ep in epochs} for phs in learn_phases}
-    allresults['params']={p:[] for p in params.keys()} #to store list of parameters
-    resultslist['params']={p:[] for p in params.keys()} 
+    traject_dict={phs:{ta:[] for ta in traject_items[phs]} for phs in learn_phases}
     #count number of responses to the following actions:
     results={phs:{a:{'Beg':[],'End':[]} for a in action_items+['rwd']} for phs in learn_phases}
     
     ### to plot performance vs trial block
-    traject_dict={phs:{ta:[] for ta in traject_items[phs]} for phs in learn_phases}
     trials_per_block=10
     events_per_block=trials_per_block* events_per_trial
     num_blocks=int((numevents+1)/events_per_block)
     params['events_per_block']=events_per_block
+    params['trials_per_block']=trials_per_block
+    params['trial_subset']=trial_subset
+    resultslist['params']={p:[] for p in params.keys()} 
+
     for r in range(runs):
         rl={}
         if 'acquire' in learn_phases:
@@ -209,10 +210,9 @@ if __name__ == "__main__":
     all_ta=list(set(all_ta))
     #move reward to front
     all_ta.insert(0, all_ta.pop(all_ta.index('rwd')))              #
-    for p in allresults['params'].keys():
-        allresults['params'][p].append(params[p])                #
+    for p in resultslist['params'].keys():               #
         resultslist['params'][p].append(params[p])
-    allresults,resultslist=rlu.save_results(results,epochs,allresults,keys,resultslist)
+    resultslist=rlu.save_results(results,keys,resultslist)
     interesting_combos={'acquire':['Pport_6kHz_left_End','rwd__End'],
                         'acquire2':['Pport_6kHz_left_End','rwd__End'],
                         'extinc':['Pport_6kHz_left_Beg','Pport_6kHz_left_End'],
@@ -222,7 +222,7 @@ if __name__ == "__main__":
     print('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%')
     print(' Using',params['numQ'], 'Q, alpha=',params['alpha'],'thresh',params['state_thresh'], 'beta=',params['beta'],'runs',runs,'of total events',numevents)
     print(' apply learning_weights:',[k+':'+str(params[k]) for k in params.keys() if k.startswith('wt')])
-    print(' forgetting=',params['forgetting'],'Q2 hetero=',params['Q2other'],'decision rule=',params['decision_rule'])
+    print(' forgetting=',params['forgetting'],'Q2 hetero=',params['Q2other'],'decision rule=',params['decision_rule'],'split=',params['split'])
     print('counts from ',trial_subset,' events (',events_per_trial,' events per trial)          BEGIN    END    std over ',runs,'runs')
     for phase in results.keys():
         for sa,counts in results[phase].items():
@@ -270,8 +270,6 @@ if __name__ == "__main__":
             rl[phase].agent.plot_Qdynamics(['center','left','right'],'surf',title=rl[phase].name)
     
     if save_reward_array:
-        params['trials_per_block']=trials_per_block
-        params['trial_subset']=trial_subset
         if block_DA_dip:
             fname='DiscrimD2'+block_DA_dip
         else:
@@ -279,8 +277,8 @@ if __name__ == "__main__":
         import datetime
         dt=datetime.datetime.today()
         date=str(dt).split()[0]
-        fname=fname+date+'_numQ'+str(params['numQ'])+'_alpha'+'_'.join([str(a) for a in params['alpha']])+\
-        '_st'+'_'.join([str(st) for st in params['state_thresh']])+'splitFalse'
+        fname=fname+date+'_numQ'+str(params['numQ'])+'_alpha'+'_'.join([str(a) for a in params['alpha']])\
+        +'_st'+'_'.join([str(st) for st in params['state_thresh']])+'_q2o'+str(params['Q2other'])+'_beta'+str(params['beta_min'])+'_split'+str(params['split'])
         np.savez(fname,par=params,results=resultslist,traject=output_data)
         if plot_Qhx==2:
             np.savez('Qhx'+fname,all_Qhx=all_Qhx,all_bounds=all_bounds,events_per_trial=events_per_trial,phases=phases,all_ideals=all_ideals)
@@ -293,6 +291,6 @@ if __name__ == "__main__":
     if save_reward_array:
         numchars=8
         allQ={i:rl['discrim'].agent.Q[i] for i in range(params['numQ'])}
-        all_labels={i:rl['discrim'].state_to_words(i,noise,chars=8) for i in range(params['numQ'])}
+        all_labels={i:rl['discrim'].state_to_words(i,noise,chars=numchars) for i in range(params['numQ'])}
         actions=rl['discrim'].agent.actions
         np.savez('staticQ'+fname,allQ=allQ,labels=all_labels,actions=actions,state_subset=[ss[0:numchars] for ss in select_states])
