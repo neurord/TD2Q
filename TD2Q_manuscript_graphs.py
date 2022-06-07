@@ -19,7 +19,7 @@ letters=['A','B','C','D','E']
 fsize=12
 
     
-def create_traject_fig(traject,phases,actions,action_text,leg_panel=0, leg_loc='best',leg_fs=fsize,sequential=False,leg_text={}):
+def create_traject_fig(traject,phases,actions,action_text,leg_panel=0, leg_loc='best',leg_fs=fsize,sequential=False,leg_text={},color_dict={}):
     fig,ax=plt.subplots(len(actions),1,sharex=True)
     ax=fig.axes
     color_inc=int((255-color_offset)/(len(traject.keys())))
@@ -37,8 +37,12 @@ def create_traject_fig(traject,phases,actions,action_text,leg_panel=0, leg_loc='
                 cmap=nQ
                 cnum=int(color_offset+(pnum+1)*color_inc)
                 leg_cols=len(traject.keys())
-            print(phase,'Q=',numQ,nQ,'c=',cnum)
-            color=colors[cmap].__call__(cnum)
+            print('traject_fit',phase,'Q=',numQ,nQ,'c=',cnum)
+            if len(color_dict):
+                color=color_dict[numQ][pnum]
+                print('col_dict, color=',color)
+            else:
+                color=colors[cmap].__call__(cnum)
             label_inc=(1-3*blank)/len(actions) #used for putting subplot labels
             ########## Text for legend ###########
             if len(phases)>len(colors):
@@ -119,7 +123,7 @@ def create_sequence_traject_fig(traject,actions,action_text):
     plt.show()
     return fig #so you can adjust size and then do fig.tight_layout()
 
-def create_bandit_fig(traject, numpanels=2):
+def create_bandit_fig(traject, numpanels=2,color_dict={}):
     fig,ax=plt.subplots(numpanels,1,sharex=True)
     ax=fig.axes
     blank=0.03
@@ -136,7 +140,10 @@ def create_bandit_fig(traject, numpanels=2):
         ax[axnum].tick_params(axis='x', labelsize=fsize)
         ax[axnum].tick_params(axis='y', labelsize=fsize)
         for pnum,phs in enumerate(data.keys()):
-            color=colors[nQ].__call__(int(color_offset+(pnum+1)*color_inc))
+            if len(color_dict):
+                color=color_dict[numQ][pnum]
+            else:
+                color=colors[nQ].__call__(int(color_offset+(pnum+1)*color_inc))
             num_blocks=len(data[phs])
             block=np.arange(num_blocks)
             ax[axnum].plot(block,data[phs],label= phs,color=color)
@@ -238,8 +245,8 @@ def barplot(mean,sterr,rows,variables,varname):
 
 if __name__ == "__main__":
     discrim=0
-    sequence=1
-    block_da=0
+    sequence=0
+    block_da=1
     bandit=0
     files=None
     ######################### DISCRIM #########################
@@ -289,7 +296,7 @@ if __name__ == "__main__":
         #action_text=['reward','6 kHz Left', '10 kHz Right', '10 kHz Left']
         actions=[(('Pport', '6kHz'),'left'),(('Pport', '10kHz'),'right'), (('Pport', '10kHz'),'left')]
         action_text=['6 kHz Left', '10 kHz Right', '10 kHz Left']
-        figB=create_traject_fig(traject,phase,actions,action_text,leg_panel=0,leg_loc='lower right', leg_fs=12) #Fig 6
+        figB=create_traject_fig(traject,phase,actions,action_text,leg_panel=1,leg_loc='upper left', leg_fs=12, sequential=True) #Fig 6
         ax=figB.axes
         ax[0].set_ylim([0,11])
         ax[1].set_ylim([-0.3,8]) 
@@ -338,25 +345,40 @@ if __name__ == "__main__":
     #################### Bandit Task Probabilities ##################
     if bandit:
         pattern='Bandit2021-12-14_numQ*_alpha*beta0.1.npz'#'Bandit2021-05-28*beta0.1.npz'#'Bandit2021-05-28_numQ2_alpha0.6_0.3_beta0.7.npz'#
-        dep_var=['split','beta_min'] #'numQ']#,'Q2other', 'decision_rule']#'trial_subset']# 
-        files=[ 'Bandit2021-12-16_numQ2_alpha0.4_0.2_q2o0.1_beta0.9_splitTrue.npz',
-                'Bandit2021-12-16_numQ2_alpha0.4_0.2_q2o0.1_beta0.1_splitFalse.npz',
-                'Bandit2021-12-16_numQ2_alpha0.4_0.2_q2o0.0_beta0.1_splitTrue.npz']
+        dep_var=['split','beta_min'] #,'Q2other', 'decision_rule']#'trial_subset']# 'numQ']#
+        files=[ 'Bandit2021-12-14_numQ2_alpha0.4_0.2_q2o0.1_beta0.1splitTrue.npz',
+                #'Bandit2021-12-16_numQ2_alpha0.4_0.2_q2o0.1_beta0.9_splitTrue.npz',
+                #'Bandit2021-12-16_numQ2_alpha0.4_0.2_q2o0.1_beta0.1_splitFalse.npz',
+                #'Bandit2021-12-16_numQ2_alpha0.4_0.2_q2o0.0_beta0.1_splitTrue.npz']
                 #'Bandit2021-12-21_numQ2_alpha0.4_0.2_q2o0.1_beta0.1_splitTrue_window1.npz']
-                #'Bandit2021-12-14_numQ1_alpha0.6_0_q2o0.1_beta0.1splitTrue.npz']
+                'Bandit2021-12-14_numQ1_alpha0.6_0_q2o0.1_beta0.1splitTrue.npz']
                  # #next four to test beta and split
                 #'Bandit2021-12-16_numQ1_alpha0.6_0_q2o0.1_beta0.9_splitTrue.npz']
                 #'Bandit2021-12-16_numQ2_alpha0.4_0.2_q2o0.1_beta0.9_splitTrue.npz', #next four to test beta and split
                 #'Bandit2021-12-16_numQ1_alpha0.6_0_q2o0.1_beta0.9_splitTrue.npz',
                 #'Bandit2021-12-16_numQ1_alpha0.6_0_q2o0.1_beta0.1_splitFalse.npz',
-                #'Bandit2021-12-16_numQ2_alpha0.4_0.2_q2o0.1_beta0.1_splitFalse.npz',
+                #'Bandit2021-12-16_numQ2_alpha0.4_0.2_q2o0.1_beta0.1_splitFalse.npz']
                 #'Bandit2021-12-16_numQ2_alpha0.4_0.2_q2o0.0_beta0.1_splitTrue.npz',  #to test q2o (Q2other)
                 #'Bandit2021-12-16_numQ1_alpha0.6_0_q2o0.0_beta0.1_splitTrue.npz']
                 #'Bandit2021-12-16_numQ1_alpha0.3_0_q2o0.1_beta0.1_splitTrue.npz', #to test number of trials (trial_subset)
                 #'Bandit2021-12-16_numQ2_alpha0.2_0.1_q2o0.1_beta0.1_splitTrue.npz'] 
                 #'Bandit2021-12-17DecisionRuledelta_numQ2_q2o0.1_beta0.1_splitTrue.npz', #to test decision rule
                 #'Bandit2021-12-17DecisionRuledelta_numQ1_q2o0.1_beta0.1_splitTrue.npz']
-
+        color_index=np.linspace(0,127,6)
+        colors=[plt.get_cmap('brg').__call__(int(c)) for c in color_index]
+        colors.insert(0,(0,0,0.6,1.0))
+        colors1=[plt.get_cmap('coolwarm').__call__(int(60)),
+        plt.get_cmap('bwr').__call__(int(60)),
+        plt.get_cmap('bwr').__call__(int(110)),
+        plt.get_cmap('PuOr').__call__(int(160)),
+        plt.get_cmap('bwr').__call__(int(160)),
+        plt.get_cmap('bwr').__call__(int(190)),
+        plt.get_cmap('coolwarm').__call__(int(190))]
+        col={'2':colors,'1':colors1}
+        #col_num=[8,0,18, 14,2,6,12]
+        #col={'2':[plt.get_cmap('tab20').colors[c] for c in col_num], '1':[plt.get_cmap('tab20').colors[c+1] for c in col_num]}
+        newcol={'2': [(1, 0, 0, 1), (0.85, 0.0, 0.25), (0.7, 0.0, 0.4), (0.5, 0.0, 0.5), (0.4, 0.0, 0.7), (0.25, 0.0, 0.85), (0, 0, 1, 1)], 
+                '1': [(1, 0.6, 0.6, 1), (1, 0.4, 0.7), (0.9, 0.35, 0.75), (0.8, 0.5, 0.8), (0.75, 0.35, 0.9), (0.7, 0.45, 1), (0.5, 0.6, 1, 1)]}
 
         traject,shift_stay=read_data(pattern,files=files)
         p_choose_L={q:{} for q in traject.keys()}
@@ -365,12 +387,12 @@ if __name__ == "__main__":
             for prob in data.keys():
                 tmp_prob[prob]=data[prob][(('Pport', '6kHz'), 'left')]['mean']/(data[prob][(('Pport', '6kHz'), 'left')]['mean']+data[prob][(('Pport', '6kHz'), 'right')]['mean'])
             p_choose_L[numQ]=dict(sorted(tmp_prob.items(),key=lambda item: float(item[0].split(':')[0])-float(item[0].split(':')[1]),reverse=True))
-        #figB=create_bandit_fig(p_choose_L,numpanels=2) #Fig 10A,B
+        figB=create_bandit_fig(p_choose_L,numpanels=2,color_dict=newcol) #Fig 10A,B
         actions=[(('Pport', '6kHz'),'left'), (('Pport', '6kHz'),'right')]
         action_text=['6 kHz Left','6 kHz Right']
         tmp_phs=list(traject['2'].keys())
         phases=sorted(tmp_phs,key=lambda tmp_phs: float(tmp_phs.split(':')[0])-float(tmp_phs.split(':')[1]),reverse=True)
-        #figBT=create_traject_fig(traject,phases,actions,action_text,leg_fs=0) #Fig 10C,D
+        figBT=create_traject_fig(traject,phases,actions,action_text,leg_fs=0,color_dict=newcol) #Fig 10C,D
         '''
         for numQ,all_counts in shift_stay.items():
             print('\n ############################ numQ=',numQ)
