@@ -11,6 +11,7 @@ from RL_TD2Q import RL
 from BanditTaskParam import params, env_params, states,act, Rbandit, Tbandit
 import RL_utils as rlu
 from BanditTaskParam import loc, tone, rwd
+from TD2Q_Qhx_graphs import Qhx_multiphase
 
 def plot_prob_traject(data,params):
     p_choose_L={}
@@ -93,8 +94,8 @@ noise=0.15 #make noise small enough or state_thresh small enough to minimize new
 #control output
 printR=False #print environment Reward matrix
 Info=False#print information for debugging
-plot_hist=0#1: plot final Q, 2: plot the time since last reward
-plot_Qhx=0 #2D or 3D plot of Q dynamics.  if 1, then plot agent responses
+plot_hist=0#1: plot final Q, 2: plot the time since last reward, etc.
+plot_Qhx=2 #2D or 3D plot of Q dynamics.  if 1, then plot agent responses
 save_data=True
 
 action_items=[(('Pport','6kHz'),'left'),(('Pport','6kHz'),'right')]
@@ -116,7 +117,7 @@ params['events_per_trial']=events_per_trial
 params['wt_learning']=False
 params['distance']='Euclidean'
 params['beta_min']=0.1#params['beta'] #increased exploration after a mistake
-params['moving_avg_window']=1  #This in units of trials, the actual window is this times the number of events per trial
+params['moving_avg_window']=3  #This in units of trials, the actual window is this times the number of events per trial
 params['decision_rule']=None#'delta'
 params['split']=True
 divide_rwd_by_prob=False
@@ -163,9 +164,12 @@ for key,counts in all_counts.items():
     for phase in learn_phases:
         counts[phase]={'stay':[0]*runs,'shift':[0]*runs}
 wrong_actions={aaa:[0]*runs for aaa in ['wander','hold']}
+all_beta=[];all_lenQ=[];all_Qhx=[]; all_bounds=[]; all_ideals=[]
+Qhx_states=[('Pport','6kHz')]
+Qhx_actions=['left','right']
 for r in range(runs):
     #randomize prob_sets
-    acqQ={};acq={}
+    acqQ={};acq={};beta=[];lenQ={q:[] for q in range(params['numQ'])}
     random_order.append([k for k in key_list]) #keep track of order of probabilities
     print('*****************************************************\n************** run',r,'prob order',key_list)
     for phs in key_list:
@@ -187,9 +191,20 @@ for r in range(runs):
             wrong_actions[aaa][r]+=acq[phs].results['action'].count(act[aaa])
         traject_dict=acq[phs].trajectory(traject_dict, traject_items,events_per_block)
         #print ('prob complete',acq.keys(), 'results',results[phs],'traject',traject_dict[phs])
+        beta.append(acq[phs].agent.learn_hist['beta'])
+        for q,qlen in acq[phs].agent.learn_hist['lenQ'].items():
+            lenQ[q].append(qlen)
     np.random.shuffle(key_list) #shuffle after run complete, so that first run does 50:50 first    
     ###### Count stay vs shift 
-    all_counts,responses=shift_stay_list(acq,all_counts)    
+    all_counts,responses=shift_stay_list(acq,all_counts)
+    #store beta, lenQ, Qhx, boundaries,ideal_states from the set of phases in a single trial/agent    
+    all_beta.append([b for bb in beta for b in bb])
+    all_lenQ.append({q:[b for bb in lenQ[q] for b in bb] for q in lenQ.keys()})
+    agents=list(acq.values()) 
+    Qhx, boundaries,ideal_states=Qhx_multiphase(Qhx_states,Qhx_actions,agents,params['numQ'])
+all_bounds.append(boundaries)
+all_Qhx.append(Qhx)
+all_ideals.append(ideal_states)
 
 all_ta=[];output_data={}
 for phs in traject_dict.keys():
@@ -253,26 +268,23 @@ rlu.plot_trajectory(output_data,traject_title,figure_sets)
 plot_prob_traject(output_data,params)
 
 if plot_Qhx:
-############## Ideally put this in TD2Q_manuscript_graphs.py
-#need to save traject_dict to do that, OR 
-#instead of responses per block, do moving average?
-    display_runs=range(min(3,runs))
+    ############## Ideally put this in TD2Q_manuscript_graphs.py
+    #need to save traject_dict to do that, OR 
+    #instead of responses per block, do moving average?
     from TD2Q_Qhx_graphs import agent_response
+    display_runs=range(min(3,runs))
     figs=agent_response(display_runs,random_order,num_blocks,traject_dict)
+    phases=list(acq.keys())
+    if save_data:
+        np.savez('Qhx'+fname,all_Qhx=all_Qhx,all_bounds=all_bounds,events_per_trial=events_per_trial,phases=phases,
+        all_ideals=all_ideals,random_order=random_order,num_blocks=num_blocks,all_beta=all_beta,all_lenQ=all_lenQ)
     
 if plot_Qhx==2:
-    from TD2Q_Qhx_graphs import Qhx_multiphase, plot_Qhx_2D       
-    states=[('Pport','6kHz')]
-    actions=['left','right']
-    phases=list(acq.keys())
-    agents=list(acq.values())
-    Qhx, boundaries,ideal_states=Qhx_multiphase(states,actions,phases,agents,params['numQ'])
+    from TD2Q_Qhx_graphs import plot_Qhx_2D 
+    #plot Qhx and response from last agent/trial      
     fig=plot_Qhx_2D(Qhx,boundaries,params['events_per_trial'],phases)   
-    if save_data:
-        np.savez('Qhx'+fname,all_Qhx=Qhx,all_bounds=boundaries,events_per_trial=events_per_trial,phases=phases,all_ideals=ideal_states,random_order=random_order,num_blocks=num_blocks)
-    
+    ########## combined figure ##############   
     fig=combined_bandit_Qhx_response(random_order,num_blocks,traject_dict,Qhx,boundaries,params['events_per_trial'],phases)
-    ########## combined figure ##############
 elif plot_Qhx==3: 
     ### B. 3D plot Q history for selected actions, for all states, one graph per phase
     for rl in acq.values():
