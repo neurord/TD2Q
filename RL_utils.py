@@ -29,7 +29,10 @@ def plot_trajectory(output_data,title,figure_sets):
                 ax=all_items.index(ta)
                 #print(phs,ta,type(data['mean']))
                 if isinstance(data['mean'],np.ndarray) or isinstance(data['mean'],list):
-                    axis[ax].errorbar(range(len(data['mean'])),data['mean'],yerr=data['sterr'],label=phs,capsize=5,c=colors.colors[cnum])
+                    if np.all(np.isnan(data['sterr'])):
+                        axis[ax].plot(range(len(data['mean'])),data['mean'],label=phs,c=colors.colors[cnum])
+                    else:
+                        axis[ax].errorbar(range(len(data['mean'])),data['mean'],yerr=data['sterr'],label=phs,capsize=5,c=colors.colors[cnum])
                 if ta=='rwd':
                     axis[ax].set_ylabel('reward')
                     axis[ax].set_ylim([np.floor(ymin),np.ceil(ymax)])
