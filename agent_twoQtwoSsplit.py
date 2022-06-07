@@ -174,6 +174,7 @@ class QL(Agent):
                     self.init_cov(i,kk)
         hist_items=['LR','TSR','rwd_hist','rwd_prob','delta','beta']
         self.learn_hist={k:[] for k in hist_items}
+        self.learn_hist['lenQ']={q:[] for q in range(self.numQ)}
         if self.prior_rwd_prob:
             self.beta=self.prior_rwd_prob*(self.beta_max-self.beta_min)+self.beta_min
         else:
@@ -355,13 +356,14 @@ class QL(Agent):
     
     def D2_learn(self,delta,q,last_state_num,prn_info=False,block_DA=False):
         ### DIFFERENT RULE for Q2 ####
-        '''
+
         #1. Invert the reward or the delta (implemented)
-        #2. Da dips have smaller dynamic range than increases
-        dip=reward**(1/3) ##3d root compresses the range
-        delta2 = dip + (self.gamma*max(self.Q[q][self.state_num[q],:]) - self.Q[q][last_state_num,self.action])
+        #2. Use the Q2 matrix to calculate delta, but use min instead of max
+        #  possibly use reward**(1/3) to compresses the range
+        #delta = reward + self.gamma*min(self.Q[q][self.state_num[q],:]) - self.Q[q][last_state_num[q],self.action]
+        '''
         #3. compress the RPE instead of the reward?
-        delta2=delta**(1/3)
+        delta2=-delta**(1/3)
         '''
         #Change the Q value according to delta (calculated in D1_learn), but DECREASE Q2 when delta is positive
         #i.e., LTD if delta positive, LTP if delta negative (DA dip)
@@ -436,6 +438,8 @@ class QL(Agent):
         self.learn_hist['LR'].append(self.learn_weight)
         self.learn_hist['rwd_prob'].append(self.rwd_prob)
         self.learn_hist['beta'].append(self.beta)
+        for q in range(self.numQ):
+            self.learn_hist['lenQ'][q].append(len(self.Q[q]))
         #
         if self.reward_cues is not None:
             allcues=self.add_reward_cue(cues,reward)
@@ -521,9 +525,13 @@ class QL(Agent):
         fig,ax=plt.subplots(len(self.learn_hist),1,sharex=True)
         fig.suptitle(title)
         for i,k in enumerate(self.learn_hist.keys()):
-            ax[i].plot(self.learn_hist[k],'k',label=k)
-            mean_hist=self.moving_average(self.learn_hist[k],self.window)
-            ax[i].plot(mean_hist,label=k+' avg')
+            if isinstance(self.learn_hist[k],dict):
+                for q in self.learn_hist[k].keys():
+                    ax[i].plot(self.learn_hist[k][q],label='Q'+str(q))
+            else:
+                ax[i].plot(self.learn_hist[k],'k',label=k)
+                mean_hist=self.moving_average(self.learn_hist[k],self.window)
+                ax[i].plot(mean_hist,label=k+' avg')
             ax[i].legend()
         plt.show()
     
