@@ -22,12 +22,12 @@ def select_phases(block_DA_dip,PREE,savings,extinct,context,action_items):
     if block_DA_dip:
         learn_phases=['acquire','extinc','discrim']
         figure_sets=[['extinc','discrim']]
-        traject_items={'acquire':[action_items[1]]+['rwd'],'extinc':[action_items[1]],'discrim':action_items[1:]+['rwd']}
+        traject_items={'acquire':[action_items[1]]+['rwd'],'extinc':[action_items[1]]+['rwd'],'discrim':action_items[1:]+['rwd']}
         ext_cue=context[0] #0 for extinction in same context
     elif PREE: #evaluate how reward prob during acquisition affects rate of extinction
         learn_phases=['acquire','extinc']
         figure_sets=[['acquire','extinc']]
-        traject_items={'acquire':[action_items[1]]+['rwd'],'extinc':[action_items[1]]}
+        traject_items={'acquire':[action_items[1]]+['rwd'],'extinc':[action_items[1]]+['rwd']}
         ext_cue=context[0] #0 for extinction in same context
     elif savings=='after extinction': #evaluate if learn faster the second time            
         learn_phases=['acquire','extinc','acquire2']
@@ -43,25 +43,25 @@ def select_phases(block_DA_dip,PREE,savings,extinct,context,action_items):
     elif extinct=='AAB':
         learn_phases=['acquire','extinc','renew']
         figure_sets=[['acquire','extinc','renew']]
-        traject_items={'acquire':[action_items[1]]+['rwd'],'extinc':[action_items[1]],'renew':[action_items[1]]}
+        traject_items={'acquire':[action_items[1]]+['rwd'],'extinc':[action_items[1]]+['rwd'],'renew':[action_items[1]]+['rwd']}
         ext_cue=context[0]
         ren_cue=context[1]
     elif extinct=='ABB':
         learn_phases=['acquire','extinc','renew']
         figure_sets=[['acquire','extinc','renew']]
-        traject_items={'acquire':[action_items[1]]+['rwd'],'extinc':[action_items[1]],'renew':[action_items[1]]}
+        traject_items={'acquire':[action_items[1]]+['rwd'],'extinc':[action_items[1]]+['rwd'],'renew':[action_items[1]]+['rwd']}
         ext_cue=context[1]
         ren_cue=context[1]
     elif extinct=='ABA':
         learn_phases=['acquire','extinc','renew']
         figure_sets=[['acquire','extinc','renew']]
-        traject_items={'acquire':[action_items[1]]+['rwd'],'extinc':[action_items[1]],'renew':[action_items[1]]}
+        traject_items={'acquire':[action_items[1]]+['rwd'],'extinc':[action_items[1]]+['rwd'],'renew':[action_items[1]]+['rwd']}
         ext_cue=context[1]
         ren_cue=context[0]
     else: #this is ABA, but with added discrim and reverse
         learn_phases=['acquire','extinc','renew','discrim','reverse']     #
         figure_sets=[['discrim','reverse'],['acquire','extinc','renew']]
-        traject_items={'acquire':[action_items[1]]+['rwd'],'extinc':[action_items[1]],'renew':[action_items[1]],
+        traject_items={'acquire':[action_items[1]]+['rwd'],'extinc':[action_items[1]]+['rwd'],'renew':[action_items[1]]+['rwd'],
                        'discrim':action_items[1:]+['rwd'],'reverse':action_items[1:]+['rwd']}
     return learn_phases,figure_sets,traject_items,acq_cue,ext_cue,ren_cue,dis_cue,ren_cue,acq2_cue
 
@@ -89,18 +89,27 @@ if __name__ == "__main__":
     action_items=[(('start','blip'),'center'),(('Pport','6kHz'),'left'),(('Pport','6kHz'),'right'),(('Pport','10kHz'),'left'),(('Pport','10kHz'),'right')]
     #action_items=['center','left','right']
 
-    block_DA_dip=False #AIP means block all change in Q2 values, no_dip means block decreases, not increases, False - control
+    block_DA_dip=False#'AIP' #AIP means block all change in Q2 values, no_dip means block decreases, not increases, False - control
     PREE=0
     savings='none'#''none'#'in new context'# 'after extinction'##'none'# #- for simulating discrim and reverse
     extinct='none' #AAB: aquire and extinguish in A, try to renew in B; ABB: aquire in A, extinguish in B, re-test renewal in B
     #Specify which learning protocols/phases to implement
     learn_phases,figure_sets,traject_items,acq_cue,ext_cue,ren_cue,dis_cue,ren_cue,acq2_cue=select_phases(block_DA_dip,PREE,savings,extinct,context,action_items)
-
+    #state_sets and phases used for saving Qhx, beta and Qlen
+    if block_DA_dip:
+        state_sets=[[('Pport','6kHz'),('Pport','10kHz')]]
+        phases=[['acquire','discrim']] 
+    elif extinct.startswith('A'):
+        state_sets=[[('Pport','6kHz')]]
+        phases=[['acquire','extinc','renew']] 
+    else:
+        state_sets=[[('Pport','6kHz'),('Pport','10kHz')],[('Pport','6kHz')]]
+        phases=[['acquire','discrim','reverse'],['acquire','extinc','renew']] 
     trial_subset=int(0.1*numevents) #display mean reward and count actions over 1st and last of these number of trials 
     from DiscriminationTaskParam2 import params,states,act
     #update some parameters of the agent
     params['decision_rule']=None#'delta' #'delta' #'combo', , 'sumQ2', None means use direct negative of D1 rule
-    params['Q2other']=0.1  
+    params['Q2other']=0.1
     params['numQ']=2
     params['events_per_trial']=events_per_trial
     params['wt_learning']=False
@@ -143,6 +152,9 @@ if __name__ == "__main__":
     params['trials_per_block']=trials_per_block
     params['trial_subset']=trial_subset
     resultslist['params']={p:[] for p in params.keys()} 
+    all_beta={'_'.join(k):[] for k in phases}
+    all_lenQ={k:{q:[] for q in range(params['numQ'])} for k in all_beta.keys()}
+    #all_Qhx=[]; all_bounds=[]; all_ideals=[]
 
     for r in range(runs):
         rl={}
@@ -181,7 +193,8 @@ if __name__ == "__main__":
                 acq_first=False
             results,disQ=rlu.run_sims(rl['discrim'],'discrim',int(numevents),trial_subset,action_items,noise,Info,dis_cue,r,results,phist=plot_hist,block_DA=block_DA_dip)
             traject_dict=rl['discrim'].trajectory(traject_dict, traject_items,events_per_block)
-            #rl['discrim'].set_of_plots('discrim, acquire 1st:'+str(acq_first),noise,t2,hist=plot_hist)
+
+             #rl['discrim'].set_of_plots('discrim, acquire 1st:'+str(acq_first),noise,t2,hist=plot_hist)
             if Info:
                 print('discrim, acquire 1st:'+str(acq_first)+', mean reward=',np.round(np.mean(rl['discrim'].results['reward'][-trial_subset:]),2))
     
@@ -200,7 +213,9 @@ if __name__ == "__main__":
             results,acq2Q=rlu.run_sims(rl['acq2'],'acquire2',numevents,trial_subset,action_items,noise,Info,acq2_cue,r,results,phist=plot_hist)
             traject_dict=rl['acquire2'].trajectory(traject_dict, traject_items,events_per_block)
             print ('>>>>>>>>>>>>>>>>>>>> savings', savings,'acq2 cue',acq2_cue)
-    ######### Average over runs, also need stdev.  
+        all_beta,all_lenQ=rlu.beta_lenQ(rl,phases,all_beta,all_lenQ,params['numQ'])
+
+######### Average over runs, also need stdev.  
     all_ta=[]; output_data={}
     for phs in traject_dict.keys():
         output_data[phs]={}
@@ -242,19 +257,10 @@ if __name__ == "__main__":
         ########################## NEXT:
         import copy
         actions=['left','right']
-        if block_DA_dip:
-            state_sets=[[('Pport','6kHz'),('Pport','10kHz')]]
-            phases=[['acquire','discrim']] 
-        elif extinct.startswith('A'):
-            state_sets=[[('Pport','6kHz')]]
-            phases=[['acquire','extinc','renew']] 
-        else:
-            state_sets=[[('Pport','6kHz'),('Pport','10kHz')],[('Pport','6kHz')]]
-            phases=[['acquire','discrim','reverse'],['acquire','extinc','renew']] 
         agents=[[rl[phs] for phs in phaseset] for phaseset in phases]
         all_Qhx={q:{} for q in range(params['numQ'])};all_bounds={q:{} for q in range(params['numQ'])};all_ideals={q:{} for q in range(params['numQ'])}
         for ij,(state_subset,phase_set,agent_set) in enumerate(zip(state_sets,phases,agents)):
-            Qhx, boundaries,ideal_states=Qhx_multiphase(state_subset,actions,phase_set,agent_set,params['numQ'])
+            Qhx, boundaries,ideal_states=Qhx_multiphase(state_subset,actions,agent_set,params['numQ'])
             fig=plot_Qhx_2D(Qhx,boundaries,events_per_trial,phase_set,ideal_states)
             for q in Qhx.keys():
                 for st in Qhx[q].keys():
@@ -281,7 +287,7 @@ if __name__ == "__main__":
         +'_st'+'_'.join([str(st) for st in params['state_thresh']])+'_q2o'+str(params['Q2other'])+'_beta'+str(params['beta_min'])+'_split'+str(params['split'])
         np.savez(fname,par=params,results=resultslist,traject=output_data)
         if plot_Qhx==2:
-            np.savez('Qhx'+fname,all_Qhx=all_Qhx,all_bounds=all_bounds,events_per_trial=events_per_trial,phases=phases,all_ideals=all_ideals)
+            np.savez('Qhx'+fname,all_Qhx=all_Qhx,all_bounds=all_bounds,events_per_trial=events_per_trial,phases=phases,all_ideals=all_ideals,all_beta=all_beta,all_lenQ=all_lenQ)
     # Q value plot of subset of states 
     select_states=['success','6kHz','10kHz']
     numchars=3

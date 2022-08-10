@@ -127,7 +127,7 @@ class RL:
                         if (state[0]=='*' or self.results['state'][tr][0]==state0num) and \
                             (self.results['state'][tr][1]==state1num or self.env.state_from_number(self.results['state'][tr])[1] in matching_state1):
                             sa_count+=1
-                allresults[sa][tf].append(sa_count/trial_subset) #events per trial
+                allresults[sa][tf].append(sa_count/trial_subset) #events per trial, fraction of responses in specified number of events
         if accum_type=='count':
             max_rwd=np.max(self.results['reward'])             
             allresults['rwd']['Beg'].append(self.results['reward'][0:event_subset].count(max_rwd))/trial_subset #number of rewards per trial
@@ -214,9 +214,9 @@ if __name__ == "__main__":
     Info=False #print information for debugging
     plot_hist=0#1: plot Q, 2: plot the time since last reward
     save_data=True #write output data in npz file
-    Qvalues=[1,2] #simulate using these values for numQ
-    inactivate=None#set to None to skip the inactivation test at the end
-    inactivate_blocks=0
+    Qvalues=[1,2] #simulate using these values for numQ, make this [2] to simulate inactivation
+    inactivate=None #set to None to skip the inactivation test at the end 'D1', 'D2'
+    inactivate_blocks=0#3 for inactivate = 'D1' or 'D2'
 
     ########## Plot Q values over time for these states and actions 
     plot_Qhx=True       
@@ -229,7 +229,12 @@ if __name__ == "__main__":
         events_per_trial=6
     elif Hx_len==4:
         #MINIMUM actions for reward = 7, so maximum rewards = 1 per 7 "trials"
-        state_action_combos=[(('Llever','**LL'), 'goR'),(('Rlever','**LL'),'press'),(('Rlever','*LLR'),'press'),(('Rlever','LLRR'),'goMag')]
+        state_action_combos=[(('Llever','**-L'), 'press'),(('Llever','**RL'), 'press'),(('Llever','**LL'), 'goR'),(('Rlever','**LL'),'press'),(('Rlever','*LLR'),'press'),(('Rlever','LLRR'),'goMag')]
+        overstay=[(('Llever','**LL'), 'goL'),(('Llever','**LL'), 'press'),(('Rlever','LLRR'),'goR'),(('Rlever','LLRR'),'press')]
+        premature=[(('Llever','**RL'), 'goR'),(('Rlever','**RL'), 'press'),(('Llever','**-L'), 'goR'),(('Rlever','**-L'), 'press'),(('Rlever','*LLR'),'goL'),(('Llever','*LLR'),'press')]
+        start=[(('mag','----'), act) for act in ['goL','goR','goMag','press','other']]
+        state_action_combos=state_action_combos+overstay+premature+start
+        sa_errors={'stay':overstay,'switch':premature,'start':start}
         events_per_trial=7
     else:
         print('unrecognized press history length')
@@ -272,6 +277,8 @@ if __name__ == "__main__":
     #params['alpha']=[0.3,0.15] # [0.2,0.14] # double learning to learn in half the trials, slower for Q2 - D2 neurons
     output_data={q:{} for q in Qvalues}
     all_Qhx={q:{} for q in Qvalues}
+    all_beta={q:[] for q in Qvalues}
+    all_lenQ={q:{qq:[] for qq in range(1,q+1)} for q in Qvalues}
     numchars=6 
     state_subset=['RRLL','RLLR']
 
@@ -285,6 +292,7 @@ if __name__ == "__main__":
     results={numQ:{sa:{'Beg':[],'End':[]} for sa in state_action_combos+['rwd']} for numQ in Qvalues}
     resultslist={numQ:{k+'_'+ep:[] for k in sa_keys.values() for ep in epochs} for numQ in Qvalues}
     traject_dict={numQ:{k:[] for k in sa_keys.keys()} for numQ in Qvalues}
+
 
     for numQ in Qvalues:
         resultslist[numQ]['params']={p:[] for p in params}
@@ -315,7 +323,11 @@ if __name__ == "__main__":
                 Qhx,state_nums=accum_Qhx(plot_Qstates,actions_colors,acq,params['numQ'],Qhx)
             #del acq #to free up memory
             print('numQ=',numQ,', run',r,'Q0 mat states=',len(acq.agent.Q[0]),'alpha',acq.agent.alpha)
-        all_Qhx[numQ]=Qhx  
+            all_beta[numQ].append(acq.agent.learn_hist['beta'])
+            for qq in all_lenQ[numQ].keys():
+                if qq-1 in acq.agent.learn_hist['lenQ'].keys():
+                    all_lenQ[numQ][qq].append(acq.agent.learn_hist['lenQ'][qq-1])
+        all_Qhx[numQ]=Qhx
         resultslist=rlu.save_results(results,sa_keys,resultslist)      
         for p in resultslist[numQ]['params'].keys():               #
             resultslist[numQ]['params'][p].append(params[p])                #
@@ -343,7 +355,7 @@ if __name__ == "__main__":
             '_st'+'_'.join([str(st) for st in params['state_thresh']])+'_q2o'+str(params['Q2other'])+'beta'+str(params['beta_min'])+'split'+str(params['split'])
             if params['inact']:
                 fname=fname +'_inactive'+params['inact']
-            np.savez(fname,par=params,results=resultslist[numQ],traject=output_data[numQ],Qhx=all_Qhx[numQ])
+            np.savez(fname,par=params,results=resultslist[numQ],traject=output_data[numQ],Qhx=all_Qhx[numQ],all_beta=all_beta[numQ],all_lenQ=all_lenQ[numQ],sa_errors=sa_errors)
             allQ={i:acq.agent.Q[i] for i in range(params['numQ'])}
             all_labels={i:acq.state_to_words(i,noise,numchars) for i in range(params['numQ'])}
             actions=acq.agent.actions

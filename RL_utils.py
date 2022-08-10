@@ -92,3 +92,17 @@ def run_sims(RL,phase,events,n_subset,action_items,noise,info,cues,rr,summary,ph
             t2=',mean reward='+str(np.round(np.mean(RL.results['reward'][-n_subset:]),2))
         RL.set_of_plots(phase,noise,t2,hist=phist)
     return summary,Q
+
+def beta_lenQ(all_agents,all_phases,all_beta,all_lenQ,numQ):
+    for phase_set in all_phases:
+        beta=[];lenQ={q:[] for q in range(numQ)}
+        key='_'.join(phase_set)
+        for phs in phase_set:
+            beta.append(all_agents[phs].agent.learn_hist['beta'])
+            for q,qlen in all_agents[phs].agent.learn_hist['lenQ'].items():
+                lenQ[q].append(qlen)
+        all_beta[key].append([b for bb in beta for b in bb])
+        for q in lenQ.keys():
+            all_lenQ[key][q].append([b for bb in lenQ[q] for b in bb]) 
+ 
+    return all_beta,all_lenQ
