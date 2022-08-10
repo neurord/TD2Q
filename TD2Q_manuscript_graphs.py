@@ -16,8 +16,8 @@ plt.ion()
 colors=[plt.get_cmap('Blues'),plt.get_cmap('Reds'),plt.get_cmap('Greys')] #plasma, viridis, inferno or magma possible
 color_offset=0
 letters=['A','B','C','D','E']
-fsize=12
-
+fsize=11
+import RL_utils as rlu
     
 def create_traject_fig(traject,phases,actions,action_text,leg_panel=0, leg_loc='best',leg_fs=fsize,sequential=False,leg_text={},color_dict={}):
     fig,ax=plt.subplots(len(actions),1,sharex=True)
@@ -29,7 +29,10 @@ def create_traject_fig(traject,phases,actions,action_text,leg_panel=0, leg_loc='
     for nQ,(numQ,data) in enumerate(traject.items()): #some figures look better if for pnum,phase comes first
         for pnum,phase in enumerate(phases):
             if len(phases)<=len(colors):
-                cmap=pnum
+                if sequential:
+                    cmap=0
+                else:
+                    cmap=pnum
                 cnum=int(nQ+1)*color_inc+color_offset
                 leg_cols=len(phases)
             else:
@@ -46,22 +49,24 @@ def create_traject_fig(traject,phases,actions,action_text,leg_panel=0, leg_loc='
             label_inc=(1-3*blank)/len(actions) #used for putting subplot labels
             ########## Text for legend ###########
             if len(phases)>len(colors):
-               trace_label=phase
-               if len(leg_text):
+                trace_label=phase
+                if len(leg_text):
                    trace_label=leg_text[phase]
-               legend_title=''.join([numQ+'Q               ' for numQ in traject.keys()])
-               #leg_fs=10
+                legend_title=''.join([numQ+'Q               ' for numQ in traject.keys()])
+                #leg_fs=10
             elif len(phases)>1:
                 trace_label=phase
                 if len(leg_text):
                    trace_label=leg_text[phase]
+                if sequential:
+                    legend_title=''
+                    trace_label='numQ='+numQ
                 if numQ.isdigit(): #don't add 'numQ=' if traject.keys() are not numQ
-                    legend_title='      '.join(['numQ='+str(numQ) for numQ in traject.keys()])
+                    legend_title=''#TEMPORARY'      '.join(['numQ='+str(numQ) for numQ in traject.keys()])
+                    #trace_label=trace_label+'Q'
                 else:
                     legend_title=''
-                    trace_label=phase+', '+numQ
-                #if numQ.isdigit(): #don't add 'Q' if traject.keys() are not numQ
-                #    trace_label=trace_label+'Q'
+                    trace_label=phase+', '+numQ                    
                 #
             else: #acquisition only
                 trace_label=numQ
@@ -75,31 +80,45 @@ def create_traject_fig(traject,phases,actions,action_text,leg_panel=0, leg_loc='
                         block=np.arange(num_blocks)
                     ymax[action_text[anum]]=max(np.max(data[phase][act]['mean']+data[phase][act]['sterr']),ymax[action_text[anum]])
                     ymin[action_text[anum]]=min(ymin[action_text[anum]],np.min(data[phase][act]['mean']-data[phase][act]['sterr']))
+                    if pnum>0: #TEMPORARY - ELIMINATE EXTRA LEGEND
+                        trace_label='_'
                     ax[anum].errorbar(block,data[phase][act]['mean'],yerr=data[phase][act]['sterr'],label= trace_label,color=color)
                     if act=='rwd':
-                        ax[anum].hlines(0,xmin=0,xmax=np.max(block),linestyle='dotted')  
+                        ax[anum].hlines(0,xmin=0,xmax=np.max(block),linestyle='dotted') 
+        maxy=np.max([axis.get_ylim()[1] for axis in ax[1:]] )
+        miny=np.min([axis.get_ylim()[0] for axis in ax[1:]] )
         for anum in range(len(ax)):
             ax[anum].set_ylabel(action_text[anum], fontsize=fsize+1)
             ax[anum].set_ylim([ymin[action_text[anum]],ymax[action_text[anum]]])
             ylim=ax[anum].get_ylim()
-            ax[anum].set_ylim([np.floor(ylim[0]),np.ceil(ylim[1])])
+            if action_text[anum]=='reward':
+                ax[anum].set_ylim([np.floor(ylim[0]),np.ceil(ylim[1])*1.05]) 
+                yticks=np.linspace(np.floor(ylim[0]),np.ceil(ylim[1]),4)
+                ylabels=[str(round(f)) for f in yticks]
+                ax[anum].set_yticks(yticks,ylabels)
+            else:
+                ax[anum].set_ylim([np.floor(miny),np.ceil(maxy)]) 
             y=(1-blank)-(anum*label_inc) #subtract because 0 is at bottom
-            if len(actions)>1:
-                fig.text(0.02,y,letters[anum], fontsize=fsize+2)
+            #if len(actions)>1:
+            #    fig.text(0.02,y,letters[anum], fontsize=fsize+2)
             ax[anum].tick_params(axis='x', labelsize=fsize)
             ax[anum].tick_params(axis='y', labelsize=fsize)                
             if sequential:
                 ax[anum].set_xlim([0,num_blocks*(pnum+1)])
             else:
                 ax[anum].set_xlim([0,num_blocks])
-            if leg_fs>0:
-                leg=ax[leg_panel].legend(frameon=True,title=legend_title,ncol=leg_cols,loc=leg_loc,fontsize=leg_fs-1,title_fontsize=leg_fs-1,handletextpad=0.2,labelspacing=0.3,columnspacing=1)# markerfirst=True
+            #if leg_fs>0:#TEMPORARY - ELIMINATE EXTRA LEGEND
+            #    leg=ax[leg_panel].legend(frameon=True,title=legend_title,ncol=leg_cols,loc=leg_loc,fontsize=leg_fs-1,title_fontsize=leg_fs-1,handletextpad=0.2,labelspacing=0.3,columnspacing=1)# markerfirst=True
     ax[anum].set_xlabel('Block', fontsize=fsize+1)
     plt.show()
     return fig #so you can adjust size and then do fig.tight_layout()
 
-def create_sequence_traject_fig(traject,actions,action_text):
-    fig,ax=plt.subplots(len(actions),1,sharex=True)
+def create_sequence_traject_fig(traject,actions,action_text,lenQ={},ept=7):
+    if len(lenQ):
+        numrows=len(actions)+1
+    else:
+        numrows=len(actions)
+    fig,ax=plt.subplots(numrows,1,sharex=False)
     ax=fig.axes
     blank=0.03
     for ijk,(numQ,data) in enumerate(traject.items()):
@@ -115,11 +134,30 @@ def create_sequence_traject_fig(traject,actions,action_text):
             if act=='rwd':
                 ax[anum].hlines(0,xmin=0,xmax=num_blocks,linestyle='dotted')                    
             y=(1-blank)-(anum*label_inc) #subtract because 0 is at bottom
-            if len(actions)>1:
-                fig.text(0.02,y,letters[anum], fontsize=fsize)
-        ax[anum].set_xlim([0,num_blocks])
+            #if len(actions)>1:
+            #    fig.text(0.02,y,letters[anum], fontsize=fsize)
+            ax[anum].set_xlim([0,num_blocks])
+
         ax[anum].set_xlabel('Block', fontsize=fsize)
         ax[0].legend(frameon=True,title='num Q')
+    if len(lenQ):
+        #lenQ[1]=lenQ[2] for numQ=2, so plot lenQ for both numQ=1 and 2
+        for q,data in lenQ.items():
+            color=colors[0].__call__(int(q)*incr)
+            Xvals=np.arange(np.shape(data[int(q)])[1])/ept
+            ax[anum+1].plot(Xvals,np.mean(data[int(q)],axis=0),label='numQ='+str(q),color=color)
+        #ax[anum+1].legend()
+        ax[anum+1].set_ylabel('States')
+        ax[-1].set_xlabel('Trial')
+    for anum in range(1,numrows):
+        if anum==numrows-1:
+            yticks=[0,20,40,60]
+        else:
+            yticks=[0,5,10]
+        ylabels=[str(round(f)) for f in yticks]
+        ax[anum].set_yticks(yticks,ylabels)
+    ax[0].set_ylim(-7.5,5.0)
+
     plt.show()
     return fig #so you can adjust size and then do fig.tight_layout()
 
@@ -176,8 +214,20 @@ def read_data(pattern, files=None, keys=None):
         traject[numQ]=data['traject'].item()
         if 'shift_stay' in data.keys():
             all_counts[numQ]=data['shift_stay'].item()
+        elif 'all_beta' in data.keys(): #files beginning on 3 June 2022
+           all_counts[numQ]=data['all_lenQ'].item()
+        if 'sa_errors' in data.keys():
+            switch=[tuple(sa) for sa in data['sa_errors'].item()['switch']]
+            switch_keys=rlu.construct_key(switch)
+            overstay=[tuple(sa) for sa in data['sa_errors'].item()['stay']]
+            overstay_keys=rlu.construct_key(overstay)
+            start=[tuple(sa) for sa in data['sa_errors'].item()['start']]
+            start_keys=rlu.construct_key(start)
+            sa_error_keys={'switch':switch_keys,'overstay':overstay_keys,'start':start_keys}
+        else:
+            sa_error_keys={}
         del data   
-    return traject,all_counts
+    return traject,all_counts,sa_error_keys
   
 ################## Stat Analysis  #########################
 def create_df(pattern,files=None,del_variables=[],params=['numQ']):
@@ -199,23 +249,21 @@ def create_df(pattern,files=None,del_variables=[],params=['numQ']):
             #numQ=str(results['params']['numQ'][0])
         del results['params']
         key_combos=list(results.keys())
+        new_results={}
         if type(results[key_combos[0]])==dict:
             #if results is dictionary of dictonaries, need to flatten it
-            new_results={}
             for phase in key_combos:
                 for key,vals in results[phase].items():
                     new_results[phase+'_'+key]=vals[0] #shape is 1 row by blocks columns
             for zr in del_variables:
                 del new_results[zr]
-            results=new_results 
         elif len(np.shape(results[key_combos[0]]))==2:
-            new_results={}
             for phs in key_combos:
                 new_key=phs.replace('*','x')
                 new_results[new_key]=results[phs][0]
             for zr in del_variables:
                 del new_results[zr]
-            results=new_results
+        results=new_results
         dfsubset=pd.DataFrame.from_dict(results,orient='index').transpose()
         for p in params:
             pval=[par[p] for i  in range(len(dfsubset))]
@@ -226,37 +274,59 @@ def create_df(pattern,files=None,del_variables=[],params=['numQ']):
     alldf=pd.concat(df).reset_index() #concatentate everything into big dictionary
     return alldf
 
-def barplot(mean,sterr,rows,variables,varname):
-    figS,ax=plt.subplots()
+def barplot(mean,sterr,variables,varname,ylabel='Reward',transpose=False):
+    figS,ax=plt.subplots(figsize=(2,2.5)) #width, height
+    if transpose:
+        mean=mean.T
+        sterr=sterr.T
+        variables=mean.columns
+    rows=list(mean.index.values)
     xlabels=['Ctrl' if x==-1 else varname+' '+str(x) for x in rows]
+    if transpose:
+        xlabels=[x[8:14] for x in rows]
     xvalues=np.arange(len(rows))
     w = 1./(len(variables)+0.5)
     for a,tv in enumerate(variables):
+        #print(tv, type(tv))
         yvalues=mean[tv].values
         yerr=sterr[tv].values
-        ax.bar(xvalues+(a-(len(variables)-1)/2)*w, yvalues,width=w,yerr=yerr,label=tv) 
-    ax.set_ylabel('Reward')
+        ax.bar(xvalues+(a-(len(variables)-1)/2)*w, yvalues,width=w,yerr=yerr,label=str(tv)[0:8]) 
+    ax.set_ylabel(ylabel)
     ax.hlines(0,np.min(xvalues),np.max(xvalues),linestyles='dashed',colors='gray')
     ax.set_xlabel('Condition')
     ax.set_xticks(xvalues,xlabels)
-    ax.legend()
+    if not tv.startswith('rwd'):
+        ax.set_ylim([0,1.2])
+        #ax.legend(loc='best',fontsize=9,frameon=False)
+    figS.suptitle('+'.join([str(v) for v in variables]))
     return figS
 
+def barplot_means(df,dep_var,test_variables):
+    print(df.groupby(dep_var)[test_variables].aggregate(['mean','std','count']))
+    mean=df.groupby(dep_var)[test_variables].mean()
+    cnt=df.groupby(dep_var)[test_variables].count()
+    sterr=df.groupby(dep_var)[test_variables].std()/np.sqrt(cnt-1)
+    return mean,cnt,sterr
 
 if __name__ == "__main__":
     discrim=0
-    sequence=0
-    block_da=1
+    sequence=1
+    block_da=0
     bandit=0
     files=None
     ######################### DISCRIM #########################
     if discrim:
-        pattern='Discrim2021-12-13_numQ?_alpha*.npz'
+        #2022 jun 14 sims used for Figs 2&3 - mean trajectory, example Q values and beta
+        #also used for statistics comparing numQ=1 vs 2
+        #2021 Dec sims used to assess the effect of beta, Q2other, State-splitting
+        pattern='discrim2022-06-14_numQ?_alpha*.npz'
         dep_var=['numQ', 'split','beta_min']#,'Q2other'] #'decision_rule']##'trial_subset']# 
-        files=['Discrim2021-12-17_numQ2_alpha0.2_0.1_st0.75_0.625_q2o0.1_beta0.9_splitTrue.npz',
-                'Discrim2021-12-14_numQ2_alpha0.2_0.1_st0.75_0.625_q2o0.1_beta0.5_splitFalse.npz',
-                'Discrim2021-12-13_numQ2_alpha0.2_0.1_st0.75_0.625_q2o0.1_beta0.5_splitTrue.npz'] 
-                #'Discrim2021-12-13_numQ1_alpha0.3_0_st1.0_0_q2o0.1_beta0.5_splitTrue.npz',
+        files=['Discrim2022-06-14_numQ1_alpha0.3_0_st1.0_0_q2o0.1_beta0.5_splitTrue.npz',
+                'Discrim2022-06-14_numQ2_alpha0.2_0.1_st0.75_0.625_q2o0.1_beta0.5_splitTrue.npz']
+                #'Discrim2021-12-17_numQ2_alpha0.2_0.1_st0.75_0.625_q2o0.1_beta0.9_splitTrue.npz',
+                #'Discrim2021-12-14_numQ2_alpha0.2_0.1_st0.75_0.625_q2o0.1_beta0.5_splitFalse.npz',
+                #'Discrim2021-12-13_numQ2_alpha0.2_0.1_st0.75_0.625_q2o0.1_beta0.5_splitTrue.npz', 
+                #'Discrim2021-12-13_numQ1_alpha0.3_0_st1.0_0_q2o0.1_beta0.5_splitTrue.npz']#,
                 #'Discrim2021-12-17_numQ1_alpha0.3_0_st1.0_0_q2o0.1_beta0.9_splitTrue.npz',#Test split, beta_min
                 #
                 #
@@ -265,7 +335,7 @@ if __name__ == "__main__":
                 #'Discrim2021-12-17_numQ1_alpha0.3_0_st1.0_0_q2o0_beta0.5_splitTrue.npz']
                 #'Discrim2021-12-17_numQ2_alpha0.2_0.1_st0.75_0.625_q2o0.1_beta0.5_splitTrue_ruleDelta.npz', #test decision rule
                 #'Discrim2021-12-17_numQ1_alpha0.3_0_st1.0_0_q2o0.1_beta0.5_splitTrue_ruleDelta.npz']
-        traject,_=read_data(pattern,files=files) 
+        traject,_,_=read_data(pattern,files=files) 
         ##### acquisition ######
         phase=['acquire']
         actions=['rwd',(('Pport', '6kHz'),'left')]
@@ -273,24 +343,30 @@ if __name__ == "__main__":
         #figA=create_traject_fig(traject,phase,actions,action_text) #Fig 2A,B
                 
         ##### extinction, renewal #####
-        phase=['extinc','renew']
-        actions=[(('Pport', '6kHz'),'left')]
-        action_text=['6 kHz Left']
-        phase_text={'extinc':'Context B','renew':'Context A'}
+        phase=['acquire','extinc','renew'] #phase=['extinc','renew']
+        actions=['rwd',(('Pport', '6kHz'),'left')]#[(('Pport', '6kHz'),'left')]
+        action_text=['reward','6 kHz Left']
+        #phase_text={'extinc':'Context B','renew':'Context A'}
+        phase_text={'acquire':'','extinc':'','renew':''}
         #figE=create_traject_fig(traject,phase,actions,action_text,leg_text=phase_text) #Fig 2C
+        #figE=create_traject_fig(traject,phase,actions,action_text,sequential=True) #Fig 2C
         
         ##### discrimination, reversal #####
-        phase=['discrim','reverse']
-        actions=['rwd',(('Pport', '6kHz'),'left'), (('Pport', '10kHz'),'right')]#(('Pport', '10kHz'),'left'),
-        action_text=['reward','6 kHz Left', '10 kHz Right'] #
-        #figD=create_traject_fig(traject,phase,actions,action_text,leg_panel=1, sequential=True) #Fig 4
-    
+        phase=['acquire','discrim','reverse']
+        actions=['rwd', (('Pport', '10kHz'),'right'),(('Pport', '10kHz'),'left')]#,(('Pport', '6kHz'),'left')]
+        action_text=['reward', '10 kHz Right', '10 kHz Left']#,'6 kHz Left'] #
+        figD=create_traject_fig(traject,phase,actions,action_text,leg_panel=1, sequential=True) #Fig 4
+        xlim=[19,61]
+        ax=figD.axes
+        for axis in ax:
+            axis.set_xlim(xlim)
+
     ######################### block Dopamine #########################
     if block_da:
         pattern='DiscrimD2AIP*.npz'
         files=['DiscrimD2AIP2021-12-13_numQ2_alpha0.2_0.1_st0.75_0.625.npz','Discrim2021-12-13_numQ2_alpha0.2_0.1_st0.75_0.625_q2o0.1_beta0.5_splitTrue.npz']
         keys=['block', 'ctrl']
-        traject,_=read_data(pattern, files, keys) 
+        traject,_,_=read_data(pattern, files, keys) 
         phase=['acquire','discrim']
         #actions=['rwd',(('Pport', '6kHz'),'left'),(('Pport', '10kHz'),'right'), (('Pport', '10kHz'),'left')]
         #action_text=['reward','6 kHz Left', '10 kHz Right', '10 kHz Left']
@@ -306,12 +382,18 @@ if __name__ == "__main__":
         pattern='Sequence2021-12-12_*_inact*.npz'
         add_barplot=1
         dep_var=['inact']#'numQ']#'split','beta_min']#, 'Q2other','split','beta_min'] #'trial_subset']# 'decision_rule']#
-        files=['Sequence2021-12-16_HxLen4_numQ1_alpha0.2_0_st0.75_0_q2o0.1beta0.9splitTrue.npz','Sequence2021-12-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue.npz']
-        files=[ 'Sequence2021-12-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue.npz',
+        #files=['Sequence2021-12-16_HxLen4_numQ1_alpha0.2_0_st0.75_0_q2o0.1beta0.9splitTrue.npz','Sequence2021-12-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue.npz']
+        files=['Sequence2022-06-20_HxLen4_numQ1_alpha0.2_0_st0.75_0_q2o0.1beta0.9splitTrue.npz','Sequence2022-06-20_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue.npz']
+        #files=[ 'Sequence2021-12-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue.npz',
+     
+        files=[ 'Sequence2022-06-20_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue.npz',
                 'Sequence2021-12-22_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue_inactiveD1.npz',
                 'Sequence2021-12-22_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue_inactiveD2.npz']
+        files=[ 'Sequence2022-08-05_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue.npz',
+                'Sequence2022-08-05_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue_inactiveD1.npz',
+                'Sequence2022-08-05_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue_inactiveD2.npz']
         keys=['Ctrl','inactiveD1','inactiveD2']#
-        '''
+        '''   
 
         files=['Sequence2021-12-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitFalse.npz',
                 'Sequence2021-12-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue.npz',
@@ -337,15 +419,20 @@ if __name__ == "__main__":
                 'Sequence2021-12-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue.npz']
          '''       
 
-        traject,_=read_data(pattern,files)#,keys) 
+        traject,all_lenQ,error_keys=read_data(pattern,files,keys) 
+        switch=[kk.replace('*','x')+'_End' for kk in error_keys['switch'].values() if 'press' in kk ]
+        overstay=[kk.replace('*','x')+'_End' for kk in error_keys['overstay'].values() if 'press' in kk]
+        start=[kk.replace('*','x')+'_End' for kk in error_keys['start'].values()]
         actions=['rwd',(('Llever', '**LL'), 'goR'), (('Rlever', '*LLR'), 'press')]
         action_text=['reward', '**LL, go Right','*LLR press R']
-        figS=create_sequence_traject_fig(traject,actions,action_text) #fig 7
-    
+        #figS=create_sequence_traject_fig(traject,actions,action_text,lenQ=all_lenQ) #fig 7
+        #figS=create_sequence_traject_fig(traject,actions,action_text) #fig 7
+
     #################### Bandit Task Probabilities ##################
     if bandit:
+        #bandit sims from 2021 dec 14-16 used for statistics and trajectory plots
         pattern='Bandit2021-12-14_numQ*_alpha*beta0.1.npz'#'Bandit2021-05-28*beta0.1.npz'#'Bandit2021-05-28_numQ2_alpha0.6_0.3_beta0.7.npz'#
-        dep_var=['split','beta_min'] #,'Q2other', 'decision_rule']#'trial_subset']# 'numQ']#
+        dep_var=['numQ']#'split','beta_min'] #,'Q2other', 'decision_rule']#'trial_subset']# 
         files=[ 'Bandit2021-12-14_numQ2_alpha0.4_0.2_q2o0.1_beta0.1splitTrue.npz',
                 #'Bandit2021-12-16_numQ2_alpha0.4_0.2_q2o0.1_beta0.9_splitTrue.npz',
                 #'Bandit2021-12-16_numQ2_alpha0.4_0.2_q2o0.1_beta0.1_splitFalse.npz',
@@ -364,23 +451,10 @@ if __name__ == "__main__":
                 #'Bandit2021-12-16_numQ2_alpha0.2_0.1_q2o0.1_beta0.1_splitTrue.npz'] 
                 #'Bandit2021-12-17DecisionRuledelta_numQ2_q2o0.1_beta0.1_splitTrue.npz', #to test decision rule
                 #'Bandit2021-12-17DecisionRuledelta_numQ1_q2o0.1_beta0.1_splitTrue.npz']
-        color_index=np.linspace(0,127,6)
-        colors=[plt.get_cmap('brg').__call__(int(c)) for c in color_index]
-        colors.insert(0,(0,0,0.6,1.0))
-        colors1=[plt.get_cmap('coolwarm').__call__(int(60)),
-        plt.get_cmap('bwr').__call__(int(60)),
-        plt.get_cmap('bwr').__call__(int(110)),
-        plt.get_cmap('PuOr').__call__(int(160)),
-        plt.get_cmap('bwr').__call__(int(160)),
-        plt.get_cmap('bwr').__call__(int(190)),
-        plt.get_cmap('coolwarm').__call__(int(190))]
-        col={'2':colors,'1':colors1}
-        #col_num=[8,0,18, 14,2,6,12]
-        #col={'2':[plt.get_cmap('tab20').colors[c] for c in col_num], '1':[plt.get_cmap('tab20').colors[c+1] for c in col_num]}
-        newcol={'2': [(1, 0, 0, 1), (0.85, 0.0, 0.25), (0.7, 0.0, 0.4), (0.5, 0.0, 0.5), (0.4, 0.0, 0.7), (0.25, 0.0, 0.85), (0, 0, 1, 1)], 
-                '1': [(1, 0.6, 0.6, 1), (1, 0.4, 0.7), (0.9, 0.35, 0.75), (0.8, 0.5, 0.8), (0.75, 0.35, 0.9), (0.7, 0.45, 1), (0.5, 0.6, 1, 1)]}
-
-        traject,shift_stay=read_data(pattern,files=files)
+        colors2=[plt.get_cmap('seismic').__call__(c) for c in [18,50]]+[plt.get_cmap('hsv').__call__(c) for c in [188,204,225]]+[plt.get_cmap('seismic').__call__(c) for c in [192,242]]
+        newcol={'2':colors2,'1':colors2}
+        ########## !!!!!!!!!!!!!! newcol from file at work - but increase the dark red by 5 to increase discriminability !!!!!!!!!!!!! ###########
+        traject,shift_stay,_=read_data(pattern,files=files)
         p_choose_L={q:{} for q in traject.keys()}
         for numQ, data in traject.items():
             tmp_prob={}
@@ -424,7 +498,6 @@ if __name__ == "__main__":
         ########## Sequence ##########
     if sequence:
         test_variables=['rwd__End']#,'Llever_**LL_goR_End'.replace('*','x'), 'Rlever_*LLR_press_End'.replace('*','x'),'Rlever_xxLL_press_End','Rlever_LLRR_goMag_End']
-   
     ########## bandit ##########
     if bandit:
         test_variables=[k+'_rwd__End' for k in ['50:50','10:50','10:90','50:90','90:10','90:50','50:10']]
@@ -440,21 +513,32 @@ if __name__ == "__main__":
     if pattern.startswith('Discrim'):
         df['mean_reward']=df.loc[:,['reverse_rwd__End','discrim_rwd__End']].mean(axis=1)
         test_variables=['mean_reward']
-    print(df.groupby(dep_var)[test_variables].aggregate(['mean','std','count']))
-    mean=df.groupby(dep_var)[test_variables].mean()
-    cnt=df.groupby(dep_var)[test_variables].count()
-    sterr=df.groupby(dep_var)[test_variables].std()/np.sqrt(cnt-1)
+    mean,cnt,sterr=barplot_means(df,dep_var,test_variables)
+    
     textname=pattern.replace('?','x').replace('*','all_').split('.npz')[0]+'summary.txt'
     columns=[tv[0:-4] for tv in test_variables]
     header=' '.join(cnt.index.names)+' '+'  '.join(columns)
     rows=list(cnt.index.values)
+    figBP=barplot(mean,sterr,test_variables,dep_var[0])
     np.savetxt(textname,np.column_stack((rows*3,np.vstack([cnt,round(mean,3),round(sterr,3)]))),fmt='%s',header=header,comments='') #Ttest tables/Fig 5 - Igor
     if bandit:
         newtv= [k+'_probL' for k in ['90:10','90:50','50:10', '50:50','10:50','50:90','10:90']] 
         print(df.groupby(dep_var)[newtv].mean())
     if sequence and add_barplot:
-        figBP=barplot(mean,sterr,rows,test_variables,dep_var[0])
-    for tv in test_variables:
+        df['Llever_1L_goR_End']=df['Llever_xxRL_goR_End']+df['Llever_xx-L_goR_End']
+        df['Rlever_1L_press_End']=df['Rlever_xxRL_press_End']+df['Rlever_xx-L_press_End']
+        df['mag_----_nostart_End']=df['mag_----_goR_End']+df['mag_----_other_End']+df['mag_----_goMag_End']+df['mag_----_press_End']
+        all_test_variables={#'overstay':['Llever_xxLL_goR_End','Llever_xxLL_press_End','Llever_xxLL_goL_End'], #correct vs over-stay
+                        #'B':['Rlever_LLRR_goMag_End','Rlever_LLRR_press_End','Rlever_LLRR_goR_End'], #correct vs stay
+                        #'C':['Rlever_xLLR_press_End','Rlever_xLLR_goL_End'], #correct vs switch
+                        #'premature':['Llever_xxRL_press_End','Llever_1L_goR_End'],#,'Rlever_1L_press_End'],
+                        #'start':['mag_----_goL_End', 'mag_----_nostart_End', ],# incorrect start
+                        'all_three':['Llever_xxLL_goR_End','Llever_xxRL_press_End','mag_----_goL_End']} 
+        for test_var in all_test_variables.values():
+            mean,cnt,sterr=barplot_means(df,dep_var,test_var)
+            figBP=barplot(mean,sterr,test_var,dep_var[0],ylabel='Responses per Trial')
+            figBP=barplot(mean,sterr,test_var,dep_var[0],ylabel='Responses per Trial',transpose=True)
+    for tv in test_variables+test_var:
         new_dep_var=[]
         for dv in dep_var:
             if df[dv].nunique()>1:
