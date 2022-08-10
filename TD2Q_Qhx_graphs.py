@@ -7,6 +7,7 @@ Created on Thu May 13 10:44:25 2021
 import numpy as np
 
 import matplotlib.pyplot as plt
+import copy
 plt.ion()
 
 # possibly accumulate Qhx, as done in Sequence task - 
@@ -59,7 +60,7 @@ def Qhx_multiphase(states,actions,agents,numQ):
                                  Qhx[q][state][ac][arr_num]=np.zeros(len(rl.agent.Qhx[q]))  
     return Qhx, boundary,ideal_states
 
-def plot_Qhx_2D(Qhx,boundary,ept,phases,ideal_states=None,fig=None,ax=None):
+def plot_Qhx_2D(Qhx,boundary,ept,phases,ideal_states=None,fig=None,ax=None,title=''):
     ######### plot Qhx for bandit and Discrim task #############
     from matplotlib import pyplot as plt
     colors=[plt.get_cmap('Blues'),plt.get_cmap('Reds'),plt.get_cmap('Purples'),plt.get_cmap('Greys')]
@@ -71,6 +72,7 @@ def plot_Qhx_2D(Qhx,boundary,ept,phases,ideal_states=None,fig=None,ax=None):
         title_prefix=''
     else:
         title_prefix=''
+    fig.suptitle(title)
     for col,q in enumerate(Qhx.keys()):
         if isinstance(q,int):
             ax[col].set_title(title_prefix+'Q'+str(q+1)+' values',fontsize=fsize-2)
@@ -100,7 +102,7 @@ def plot_Qhx_2D(Qhx,boundary,ept,phases,ideal_states=None,fig=None,ax=None):
             if leg_cols==2:
                 newlabels=[letters[int(lbl.split()[-1])] for lbl in labels]#for Qhx figure in manuscript
                 leg_ttl=list(np.unique([lbl.split()[0] for lbl in labels]))
-                leg_loc='center right'
+                leg_loc='center right'#'best'#
                 ax[axnum].legend(handles,newlabels,loc=leg_loc,ncol=leg_cols,title='     '.join(leg_ttl),fontsize=fsizeSml,title_fontsize=fsizeSml,handletextpad=0.2,labelspacing=0.3,columnspacing=1)
             else:
                 if len(ax) > 1:
@@ -121,7 +123,7 @@ def plot_Qhx_2D(Qhx,boundary,ept,phases,ideal_states=None,fig=None,ax=None):
             ax[axnum].set_ylim([round(minQ-0.1*Qrange),round(maxQ+0.2*Qrange)]) #inset the curve to make room for text
             ax[axnum].tick_params(axis='both', which='major', labelsize=fsizeSml)
             for jj,xval in enumerate(boundary[q][state][1:]):
-                #textx=(xval+boundary[q][state][jj])/2 #ax[axnum].transData
+                textx=(xval+boundary[q][state][jj])/2 #ax[axnum].transData
                 textx=0.5*(xval+boundary[q][state][jj]-startx)/boundary[q][state][-1] #transAxes
                 if isinstance(phases[0],str):
                     phs=phases[jj]
@@ -136,8 +138,8 @@ def plot_Qhx_2D(Qhx,boundary,ept,phases,ideal_states=None,fig=None,ax=None):
                 ax[axnum].vlines(xval,round(minQ),round(maxQ),linestyles='dashed',color='grey')
             y=(1-blank)-(row*label_inc) #subtract because 0 is at bottom
             #if len(Qhx[q].keys())>1:
-                #fig.text(0.02,y,letters[row], fontsize=fsize)
-    plt.show()
+            #    fig.text(0.02,y,letters[row], fontsize=fsize)
+        plt.show()
     return fig
 
 def agent_response(runs,random_order,num_blocks,traject_dict,fig=None,ax=None):
@@ -212,7 +214,7 @@ def plot_Qhx_sequence(Qhx,actions,ept,numQ):
     plt.show()
     return figures
 
-def plot_Qhx_sequence_1fig(allQhx,plot_states,actions_colors,ept):                                                        
+def plot_Qhx_sequence_1fig(allQhx,plot_states,actions_colors,ept,actions_lines):                                                        
     numcols=3  ######## change this to numQ if 1 figure per numQ
     plot_state_trunc=[state[0][0:3]+','+state[1] for state in plot_states]
     fig,axis=plt.subplots(len(plot_states),numcols,sharex=True)
@@ -241,7 +243,8 @@ def plot_Qhx_sequence_1fig(allQhx,plot_states,actions_colors,ept):
                             Yvals=np.mean(Qhx[state][q][press_hx][ac],axis=0)
                             #trial number = event/events_per_trial (ept)
                             Xvals=np.arange(len(Yvals))/ept
-                            ax[axnum].plot(Xvals,Yvals,label=ac,color=color)
+                            if ac != 'goMag':
+                                ax[axnum].plot(Xvals,Yvals,label=ac,color=color, linestyle=actions_lines[ac])
                         if col==0:
                             ax[axnum].set_ylabel(','.join(list(plot_states[row])))
                         ax[axnum].set_ylim([minQ,maxQ])
@@ -337,12 +340,7 @@ def combined_bandit_Qhx_response(random_order,num_blocks,traject_dict,Qhx,bounda
         ax[4].set_ylabel('States')
     ax[-1].set_xlabel('Trial')
     ##### add boundaries ####
-    for axnum in range(3,numrows):
-        q=list(Qhx.keys())[0]
-        state=list(Qhx[q].keys())[0]
-        ylim=ax[axnum].get_ylim()
-        for jj,xval in enumerate(boundaries[q][state][1:]):
-            ax[axnum].vlines(xval,ylim[0],ylim[1],linestyles='dashed',color='grey')
+    add_boundaries(numrows,Qhx,boundaries,ax)
 
     #add subplot labels 
     fsize=14
@@ -374,38 +372,60 @@ def add_labels(fig,numcols):
         fig.text(x,y,letters[col]+str(row+1), fontsize=fsize)
     return
 
-def combined_discrim_Qhx(Qhx,boundaries,ept,phases,all_ideals,beta=[],Qlen=[]):
+def combined_discrim_Qhx(Qhx,boundaries,ept,phases,all_ideals,all_beta=[],Qlen=[],agent=-1):
     from matplotlib.gridspec import GridSpec
     import matplotlib.pyplot as plt
     
-    fig=plt.figure()
+    Qkeys=list(Qhx.keys())
+    beta_axnum=len(Qhx[Qkeys[0]].keys())
     if len(Qlen):
-        numrows=4
+        numrows=beta_axnum+2 
     else:
-        numrows=3
+        numrows=beta_axnum+1
+    
+    fig=plt.figure()
     gs=GridSpec(numrows,2)
     ax=[]
     for row in range(numrows):
         ax.append(fig.add_subplot(gs[row,:]))
-    
-    fig=plot_Qhx_2D(Qhx,boundaries,ept,phases,all_ideals,fig=fig,ax=[ax[0],ax[1]]) 
-    Xvals=np.arange(len(beta))/ept
-    ax[2].plot(Xvals,beta)
-    ax[2].set_ylabel(r'$\beta$')
+
+    fig=plot_Qhx_2D(Qhx,boundaries,ept,phases,all_ideals,fig=fig,ax=ax[0:beta_axnum]) 
+    if isinstance(all_beta,list):
+        beta=all_beta[agent]
+        Xvals=np.arange(len(beta))/ept
+        ax[beta_axnum].plot(Xvals,beta)
+        #ax[beta_axnum].plot(Xvals,np.mean(beta,axis=0))
+    else:
+        for key in all_beta.keys():
+            beta=all_beta[key]
+            Xvals=np.arange(np.shape(beta)[1])/ept
+            ax[beta_axnum].plot(Xvals,np.mean(beta,axis=0),label=key)
+    ax[beta_axnum].set_ylabel(r'$\beta$')
+    yticks=[str(round(f,1)) for f in np.arange(0.5,0.91,0.2)]
+    ax[beta_axnum].set_yticks(np.arange(0.5,0.91,0.2),yticks)
+    #ax[beta_axnum].legend()
     if len(Qlen):
-        for q,data in Qlen.items():
-            length_q=[qq for q_row in data for qq in q_row]
-            ax[3].plot(Xvals,length_q,label='Q'+str(q+1))
-        ax[3].legend()
-        ax[3].set_ylabel('States',fontsize=fsizeSml+1)
+        qnum=beta_axnum+1
+        for key1,data in Qlen.items(): 
+            if isinstance(data,dict):
+                for key2,d2 in Qlen[key1].items():
+                    ax[qnum].plot(Xvals,d2[agent],label=key1+',Q'+str(key2))
+                ymax=np.max([d2[agent] for d2 in Qlen[key1].values()] )
+            else:           
+                ax[qnum].plot(Xvals,data[agent],label='Q'+str(key1+1))
+                ymax=np.max([data[agent] for data in Qlen.values()] )
+        ax[qnum].legend()
+        ax[qnum].set_ylabel('States',fontsize=fsizeSml+1)
+        yticks = np.linspace(0,np.ceil(ymax)+np.ceil(ymax)%2,3,endpoint=True)
+        ylabels=[str(round(f)) for f in yticks]
+        ax[qnum].set_yticks(yticks,ylabels)
     ax[-1].set_xlabel('Trial',fontsize=fsizeSml+1)
-    ##### add boundaries ####
-    for axnum in range(2,numrows):
-        q=list(Qhx.keys())[0]
-        state=list(Qhx[q].keys())[0]
-        ylim=ax[axnum].get_ylim()
-        for jj,xval in enumerate(boundaries[q][state][1:]):
-            ax[axnum].vlines(xval,ylim[0],ylim[1],linestyles='dashed',color='grey')
+
+    #length_q=[qq for q_row in data for qq in q_row]
+    #ax[3].plot(Xvals,length_q,label='Q'+str(q+1))
+
+    ##### add vertical line showing phase boundaries ####
+    add_boundaries(numrows,Qhx,boundaries,ax)
 
     #add subplot labels 
     '''fsize=14
@@ -417,28 +437,48 @@ def combined_discrim_Qhx(Qhx,boundaries,ept,phases,all_ideals,beta=[],Qlen=[]):
     fig.tight_layout()
     return fig
 
+def add_boundaries(numrows,Qhx,boundaries,ax):
+    for axnum in range(3,numrows):
+        q=list(Qhx.keys())[0]
+        state=list(Qhx[q].keys())[0]
+        ylim=ax[axnum].get_ylim()
+        for jj,xval in enumerate(boundaries[q][state][1:]):
+            ax[axnum].vlines(xval,ylim[0],ylim[1],linestyles='dashed',color='grey')
+
+def new_xlim(figs,xlim):
+    for figname in figs.keys():
+        ax=figs[figname].axes
+        for axis in ax:
+            axis.set_xlim(xlim)
+
 if __name__ == "__main__":
-    sequence=False
+    sequence=True
     if sequence:
-        fil={'1':'Sequence2021-12-16_HxLen4_numQ1_alpha0.2_0_st0.75_0_q2o0.1beta0.9splitTrue','2':'Sequence2021-12-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue'}
+        #fil={'1':'Sequence2021-12-16_HxLen4_numQ1_alpha0.2_0_st0.75_0_q2o0.1beta0.9splitTrue','2':'Sequence2021-12-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue'}
+        fil={'1':'Sequence2022-06-20_HxLen4_numQ1_alpha0.2_0_st0.75_0_q2o0.1beta0.9splitTrue','2':'Sequence2022-06-20_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue'}
         figs={q:{} for q in fil.keys()}
         events_per_trial=7
         state_action_combos=[('Llever','RRLL'),('Rlever','LLLL'),('Rlever','RLLR'),('Rlever','RRLL')]
-        actions_colors={'goL':'r','goR':'b','press':'k','goMag':'grey'}
+        actions_colors={'goL':'b','goR':'r','press':'k','goMag':'gray'}
+        actions_lines={'goL':'solid','goR':'solid','press':'dashed','goMag':'dotted'}
         allQhx={}
         for nQ,f in fil.items():
             data=np.load(f+'.npz',allow_pickle=True)
             allQhx[nQ]=data['Qhx'].item() 
             #fig=plot_Qhx_sequence_1fig(allQhx[nQ],state_action_combos,actions_colors,events_per_trial)
             #figs=staticQ(f,figs,nQ)
-        fig=plot_Qhx_sequence_1fig(allQhx,state_action_combos,actions_colors,events_per_trial)#Fig 8
+        fig=plot_Qhx_sequence_1fig(allQhx,state_action_combos,actions_colors,events_per_trial,actions_lines)#Fig 8
 
 
     else:
+        #new Bandit sim (2022jun3) used for Fig 5 - example
+        #new set of Discrim simulations used for Fig 2,3 - examples and mean trajectory
         fil={'1':'Discrim2021-12-13_numQ1_alpha0.3_0_st1.0_0', '2':'Discrim2021-12-13_numQ2_alpha0.2_0.1_st0.75_0.625'}
         fil={'2':'DiscrimD2AIP2021-12-13_numQ2_alpha0.2_0.1_st0.75_0.625'}
         fil={'2':'DiscrimD2AIP2022-06-06_numQ2_alpha0.2_0.1_st0.75_0.625_q2o0.1_beta0.5_splitTrue'}
-        #fil={'2':'Bandit2022-06-06_numQ2_alpha0.4_0.2_q2o0.1_beta0.1_splitTrue_window3'}#'Bandit2021-12-16_numQ2_alpha0.4_0.2_q2o0.1_beta0.9_splitTrue'} #}
+        fil={'2':'Bandit2022-06-03_numQ2_alpha0.4_0.2_q2o0.1_beta0.1_splitTrue_window3'}#'Bandit2021-12-16_numQ2_alpha0.4_0.2_q2o0.1_beta0.9_splitTrue'} #}
+        fil={#'1':'Discrim2022-06-14_numQ1_alpha0.3_0_st1.0_0_q2o0.1_beta0.5_splitTrue',
+             '2':'Discrim2022-06-14_numQ2_alpha0.2_0.1_st0.75_0.625_q2o0.1_beta0.5_splitTrue' }
         figs={q:{} for q in fil.keys()}
         for nQ,f in fil.items():
             data=np.load('Qhx'+f+'.npz',allow_pickle=True)
@@ -448,11 +488,11 @@ if __name__ == "__main__":
             phases=[[p for p in phs] for phs in data['phases']]
             all_ideals=data['all_ideals'].item()
             if 'all_beta' in data.keys(): #files beginning on 3 June 2022
-                all_beta=data['all_beta']
-                all_lenQ=data['all_lenQ']
+                all_beta=data['all_beta'].item()
+                all_lenQ=data['all_lenQ'].item()
                 #all_rwdprob=data['rwd_prob']
-            if 'random_order' in data.keys(): #bandit task only
-                trial=23 #3 #[2,5,28] - for June 6
+            if 'random_order' in data.keys(): #bandit task only, Qhx for all trials is saved
+                trial=39 #[3,23,39] for June 3 2022 #[2,5,28] - for June 6, 2022
                 if isinstance(all_Qhx,list):
                     Qhx=all_Qhx[trial]
                     bounds=all_bounds[trial]
@@ -464,15 +504,26 @@ if __name__ == "__main__":
                 num_blocks=data['num_blocks'].item()
                 data2=np.load(f+'.npz',allow_pickle=True)
                 traject_dict=data2['traject_dict'].item()
-                agent_response([2,5,28],random_order,num_blocks,traject_dict)
-                fig_combined=combined_bandit_Qhx_response(random_order,num_blocks,traject_dict,Qhx,bounds,events_per_trial,phases,agent_num=28,all_beta=all_beta)#,all_lenQ)
+                agent_response([3,23,39],random_order,num_blocks,traject_dict)
+                fig_combined=combined_bandit_Qhx_response(random_order,num_blocks,traject_dict,Qhx,bounds,events_per_trial,phases,agent_num=trial,all_beta=all_beta)#,all_lenQ)
             else: #Discrim, or older Bandit files, random order not saved, all_Qhx is single dictionary,
-                state='Pport,10kHz 0'
-                all_lenQ=data['all_lenQ'].item() #dictionary, because only saved for a single agent
-                Qhx_subset={state:{k:v[state] for k,v in all_Qhx.items()}}
-                bounds_subset={state:{k:v[state] for k,v in all_bounds.items()}}
-                ideals_subset={state:{k:v[state] for k,v in all_ideals.items()}}
-                beta=[bb for brow in all_beta for bb in brow]
-                #figs[nQ]['qhx']=plot_Qhx_2D(all_Qhx,all_bounds,events_per_trial,phases,all_ideals)
-                figs[nQ]['qhx']=combined_discrim_Qhx(Qhx_subset,bounds_subset,events_per_trial,phases,ideals_subset,beta=beta,Qlen=all_lenQ)
+                states=['Pport,6kHz 0','Pport,10kHz 0'] #for discrim,reverse
+                #states=['Pport,6kHz 1'] #for acq,extinct
+                for state in states:
+                    Qhx_subset={state:{k:v[state] for k,v in all_Qhx.items()}}
+                    bounds_subset={state:{k:v[state] for k,v in all_bounds.items()}}
+                    ideals_subset={state:{k:v[state] for k,v in all_ideals.items()}}
+                    keynum=int(state.split()[-1])
+                    bkey=list(all_beta.keys())[keynum]
+                    beta=copy.deepcopy(all_beta[bkey])
+                    print('figures for',state,f,',bkey =',bkey)
+
+                    #figs[nQ]['qhx']=plot_Qhx_2D(Qhx_subset,bounds_subset,events_per_trial,phases,ideals_subset,title=bkey+' ,'+state)
+                    figs[nQ]['qhx'+state]=combined_discrim_Qhx(Qhx_subset,bounds_subset,events_per_trial,phases,ideals_subset,all_beta=beta,Qlen=all_lenQ[bkey])
+                print('figures for all:',f)
+                if int(nQ)>1:
+                    figs[nQ]['qhx_all']=plot_Qhx_2D(all_Qhx,all_bounds,events_per_trial,phases,all_ideals,title='all phases')
+                else:
+                    figs[nQ]['qhx_all']=combined_discrim_Qhx(all_Qhx,all_bounds,events_per_trial,phases,all_ideals,all_beta=all_beta,Qlen=all_lenQ)
                 #figs=staticQ(f,figs,nQ)
+                new_xlim(figs[nQ],[190,610])
