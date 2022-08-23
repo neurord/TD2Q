@@ -259,7 +259,10 @@ def create_df(pattern,files=None,del_variables=[],params=['numQ']):
                 del new_results[zr]
         elif len(np.shape(results[key_combos[0]]))==2:
             for phs in key_combos:
-                new_key=phs.replace('*','x')
+                if '--' in phs:
+                    new_key=phs.replace('-','s')
+                else:
+                    new_key=phs.replace('*','x')
                 new_results[new_key]=results[phs][0]
             for zr in del_variables:
                 del new_results[zr]
@@ -283,14 +286,15 @@ def barplot(mean,sterr,variables,varname,ylabel='Reward',transpose=False):
     rows=list(mean.index.values)
     xlabels=['Ctrl' if x==-1 else varname+' '+str(x) for x in rows]
     if transpose:
-        xlabels=[x[8:14] for x in rows]
+        xlabels=[x[7:16] for x in rows]
     xvalues=np.arange(len(rows))
     w = 1./(len(variables)+0.5)
     for a,tv in enumerate(variables):
         #print(tv, type(tv))
         yvalues=mean[tv].values
         yerr=sterr[tv].values
-        ax.bar(xvalues+(a-(len(variables)-1)/2)*w, yvalues,width=w,yerr=yerr,label=str(tv)[0:8]) 
+        lbl='Ctrl' if tv==-1 else tv
+        ax.bar(xvalues+(a-(len(variables)-1)/2)*w, yvalues,width=w,yerr=yerr,label=str(lbl)[0:8]) 
     ax.set_ylabel(ylabel)
     ax.hlines(0,np.min(xvalues),np.max(xvalues),linestyles='dashed',colors='gray')
     ax.set_xlabel('Condition')
@@ -321,12 +325,12 @@ if __name__ == "__main__":
         #2021 Dec sims used to assess the effect of beta, Q2other, State-splitting
         pattern='discrim2022-06-14_numQ?_alpha*.npz'
         dep_var=['numQ', 'split','beta_min']#,'Q2other'] #'decision_rule']##'trial_subset']# 
-        files=['Discrim2022-06-14_numQ1_alpha0.3_0_st1.0_0_q2o0.1_beta0.5_splitTrue.npz',
-                'Discrim2022-06-14_numQ2_alpha0.2_0.1_st0.75_0.625_q2o0.1_beta0.5_splitTrue.npz']
-                #'Discrim2021-12-17_numQ2_alpha0.2_0.1_st0.75_0.625_q2o0.1_beta0.9_splitTrue.npz',
-                #'Discrim2021-12-14_numQ2_alpha0.2_0.1_st0.75_0.625_q2o0.1_beta0.5_splitFalse.npz',
-                #'Discrim2021-12-13_numQ2_alpha0.2_0.1_st0.75_0.625_q2o0.1_beta0.5_splitTrue.npz', 
-                #'Discrim2021-12-13_numQ1_alpha0.3_0_st1.0_0_q2o0.1_beta0.5_splitTrue.npz']#,
+        files=['Discrim2021-12-17_numQ2_alpha0.2_0.1_st0.75_0.625_q2o0.1_beta0.9_splitTrue.npz',
+                'Discrim2021-12-14_numQ2_alpha0.2_0.1_st0.75_0.625_q2o0.1_beta0.5_splitFalse.npz',
+                'Discrim2021-12-13_numQ2_alpha0.2_0.1_st0.75_0.625_q2o0.1_beta0.5_splitTrue.npz'] 
+                #['Discrim2022-06-14_numQ1_alpha0.3_0_st1.0_0_q2o0.1_beta0.5_splitTrue.npz',
+                #'Discrim2022-06-14_numQ2_alpha0.2_0.1_st0.75_0.625_q2o0.1_beta0.5_splitTrue.npz']
+                #             #'Discrim2021-12-13_numQ1_alpha0.3_0_st1.0_0_q2o0.1_beta0.5_splitTrue.npz']#,
                 #'Discrim2021-12-17_numQ1_alpha0.3_0_st1.0_0_q2o0.1_beta0.9_splitTrue.npz',#Test split, beta_min
                 #
                 #
@@ -379,47 +383,45 @@ if __name__ == "__main__":
         ax[2].set_ylim([-0.3,8]) 
     #################### Sequence trajectory ##################
     if sequence:
-        pattern='Sequence2021-12-12_*_inact*.npz'
+        pattern='Sequence2022-08-16_*.npz'
         add_barplot=1
-        dep_var=['inact']#'numQ']#'split','beta_min']#, 'Q2other','split','beta_min'] #'trial_subset']# 'decision_rule']#
+        dep_var=['numQ']
+        test_var=[]
         #files=['Sequence2021-12-16_HxLen4_numQ1_alpha0.2_0_st0.75_0_q2o0.1beta0.9splitTrue.npz','Sequence2021-12-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue.npz']
-        files=['Sequence2022-06-20_HxLen4_numQ1_alpha0.2_0_st0.75_0_q2o0.1beta0.9splitTrue.npz','Sequence2022-06-20_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue.npz']
-        #files=[ 'Sequence2021-12-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue.npz',
-     
-        files=[ 'Sequence2022-06-20_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue.npz',
-                'Sequence2021-12-22_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue_inactiveD1.npz',
-                'Sequence2021-12-22_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue_inactiveD2.npz']
-        files=[ 'Sequence2022-08-05_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue.npz',
-                'Sequence2022-08-05_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue_inactiveD1.npz',
-                'Sequence2022-08-05_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue_inactiveD2.npz']
-        keys=['Ctrl','inactiveD1','inactiveD2']#
-        '''   
+        files=[ 'Sequence2022-08-10_HxLen4_numQ1_alpha0.2_0_st0.75_0_q2o0.1beta0.9splitTrue.npz','Sequence2022-08-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue.npz']
+        if add_barplot:
+            files=[ 'Sequence2022-08-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue.npz',
+                    'Sequence2022-08-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue_inactiveD1.npz',
+                    'Sequence2022-08-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue_inactiveD2.npz']
 
-        files=['Sequence2021-12-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitFalse.npz',
+            keys=['Ctrl','inactiveD1','inactiveD2']#
+            traject,all_lenQ,error_keys=read_data(pattern,files,keys)   
+            dep_var=['inact']#'split','beta_min']#, 'Q2other','split','beta_min'] #'trial_subset']# 'decision_rule']#
+
+            '''#'Sequence2021-12-16_HxLen4_numQ1_alpha0.2_0_st0.75_0_q2o0.1beta0.9splitTrue.npz',
+                    #'Sequence2021-12-17DecisionRuledelta_numQ2.npz', #test delta rule
+                    #'Sequence2021-12-17DecisionRuledelta_numQ1.npz']
+            #Additional files for testing effect of state_splitting, beta_min, Q2other
+            files=['Sequence2021-12-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitFalse.npz',
                 'Sequence2021-12-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue.npz',
                 'Sequence2021-12-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.5splitTrue.npz']
-                #'Sequence2021-12-16_HxLen4_numQ1_alpha0.2_0_st0.75_0_q2o0.1beta0.9splitTrue.npz',
-                #'Sequence2021-12-17DecisionRuledelta_numQ2.npz', #test delta rule
-                #'Sequence2021-12-17DecisionRuledelta_numQ1.npz']
-        #Additional files for testing effect of state_splitting, beta_min, Q2other
+            files=['Sequence2021-12-16_HxLen4_numQ1_alpha0.2_0_st0.75_0_q2o0.0beta0.5splitTrue.npz',
+                    'Sequence2021-12-16_HxLen4_numQ1_alpha0.2_0_st0.75_0_q2o0.0beta0.9splitTrue.npz',
+                    'Sequence2021-12-16_HxLen4_numQ1_alpha0.2_0_st0.75_0_q2o0.1beta0.5splitTrue.npz',
+                    'Sequence2021-12-16_HxLen4_numQ1_alpha0.2_0_st0.75_0_q2o0.1beta0.9splitTrue.npz',
+                    'Sequence2021-12-16_HxLen4_numQ2_alpha0.2_0.25_st0.75_0.75_q2o0.0beta0.5splitTrue.npz',    
+                    'Sequence2021-12-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.5splitTrue.npz',
+                    'Sequence2021-12-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue.npz',
+                    'Sequence2021-12-16_HxLen4_numQ1_alpha0.2_0_st0.75_0_q2o0.1beta0.9splitFalse.npz',
+                    'Sequence2021-12-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitFalse.npz',]
+            files=['Sequence2021-12-16_HxLen4_numQ1_alpha0.2_0_st0.75_0_q2o0.1beta0.9splitFalse.npz',
+                    'Sequence2021-12-16_HxLen4_numQ1_alpha0.2_0_st0.75_0_q2o0.1beta0.9splitTrue.npz',
+                    'Sequence2021-12-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitFalse.npz',
+                    'Sequence2021-12-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue.npz']
+            '''       
+        else:
+            traject,all_lenQ,error_keys=read_data(pattern,files)#,keys) 
 
-        files=['Sequence2021-12-16_HxLen4_numQ1_alpha0.2_0_st0.75_0_q2o0.0beta0.5splitTrue.npz',
-                'Sequence2021-12-16_HxLen4_numQ1_alpha0.2_0_st0.75_0_q2o0.0beta0.9splitTrue.npz',
-                'Sequence2021-12-16_HxLen4_numQ1_alpha0.2_0_st0.75_0_q2o0.1beta0.5splitTrue.npz',
-                'Sequence2021-12-16_HxLen4_numQ1_alpha0.2_0_st0.75_0_q2o0.1beta0.9splitTrue.npz',
-                'Sequence2021-12-16_HxLen4_numQ2_alpha0.2_0.25_st0.75_0.75_q2o0.0beta0.5splitTrue.npz',
- 
-                'Sequence2021-12-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.5splitTrue.npz',
-                'Sequence2021-12-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue.npz',
-                'Sequence2021-12-16_HxLen4_numQ1_alpha0.2_0_st0.75_0_q2o0.1beta0.9splitFalse.npz',
-                'Sequence2021-12-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitFalse.npz',]
-        files=['Sequence2021-12-16_HxLen4_numQ1_alpha0.2_0_st0.75_0_q2o0.1beta0.9splitFalse.npz',
-                'Sequence2021-12-16_HxLen4_numQ1_alpha0.2_0_st0.75_0_q2o0.1beta0.9splitTrue.npz',
-                'Sequence2021-12-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitFalse.npz',
-                'Sequence2021-12-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue.npz']
-         '''       
-
-        traject,all_lenQ,error_keys=read_data(pattern,files,keys) 
         switch=[kk.replace('*','x')+'_End' for kk in error_keys['switch'].values() if 'press' in kk ]
         overstay=[kk.replace('*','x')+'_End' for kk in error_keys['overstay'].values() if 'press' in kk]
         start=[kk.replace('*','x')+'_End' for kk in error_keys['start'].values()]
@@ -432,13 +434,13 @@ if __name__ == "__main__":
     if bandit:
         #bandit sims from 2021 dec 14-16 used for statistics and trajectory plots
         pattern='Bandit2021-12-14_numQ*_alpha*beta0.1.npz'#'Bandit2021-05-28*beta0.1.npz'#'Bandit2021-05-28_numQ2_alpha0.6_0.3_beta0.7.npz'#
-        dep_var=['numQ']#'split','beta_min'] #,'Q2other', 'decision_rule']#'trial_subset']# 
+        dep_var=['split','beta_min'] #,'numQ']#'Q2other', 'decision_rule']#'trial_subset']# 
         files=[ 'Bandit2021-12-14_numQ2_alpha0.4_0.2_q2o0.1_beta0.1splitTrue.npz',
-                #'Bandit2021-12-16_numQ2_alpha0.4_0.2_q2o0.1_beta0.9_splitTrue.npz',
-                #'Bandit2021-12-16_numQ2_alpha0.4_0.2_q2o0.1_beta0.1_splitFalse.npz',
+                'Bandit2021-12-16_numQ2_alpha0.4_0.2_q2o0.1_beta0.9_splitTrue.npz',
+                'Bandit2021-12-16_numQ2_alpha0.4_0.2_q2o0.1_beta0.1_splitFalse.npz']
                 #'Bandit2021-12-16_numQ2_alpha0.4_0.2_q2o0.0_beta0.1_splitTrue.npz']
                 #'Bandit2021-12-21_numQ2_alpha0.4_0.2_q2o0.1_beta0.1_splitTrue_window1.npz']
-                'Bandit2021-12-14_numQ1_alpha0.6_0_q2o0.1_beta0.1splitTrue.npz']
+                #'Bandit2021-12-14_numQ1_alpha0.6_0_q2o0.1_beta0.1splitTrue.npz']
                  # #next four to test beta and split
                 #'Bandit2021-12-16_numQ1_alpha0.6_0_q2o0.1_beta0.9_splitTrue.npz']
                 #'Bandit2021-12-16_numQ2_alpha0.4_0.2_q2o0.1_beta0.9_splitTrue.npz', #next four to test beta and split
@@ -526,18 +528,25 @@ if __name__ == "__main__":
         print(df.groupby(dep_var)[newtv].mean())
     if sequence and add_barplot:
         df['Llever_1L_goR_End']=df['Llever_xxRL_goR_End']+df['Llever_xx-L_goR_End']
-        df['Rlever_1L_press_End']=df['Rlever_xxRL_press_End']+df['Rlever_xx-L_press_End']
-        df['mag_----_nostart_End']=df['mag_----_goR_End']+df['mag_----_other_End']+df['mag_----_goMag_End']+df['mag_----_press_End']
+        df['Llever_1L_press_End']=df['Llever_xxRL_press_End']+df['Llever_xx-L_press_End']
+        df['mag_ssss_nostart_End']=df['mag_ssss_goR_End']+df['mag_ssss_other_End']+df['mag_ssss_goMag_End']+df['mag_ssss_press_End']
+        df['Llever_1L_press_End_Prob']=(df['Llever_1L_press_End'])/(df['Llever_1L_press_End']+df['Llever_xx-L_goR_End']+df['Llever_xx-L_goMag_End']+df['Llever_xx-L_other_End']+df['Llever_xxRL_other_End']+df['Llever_xxRL_goMag_End']+df['Llever_xxRL_goR_End'])
+        df['Llever_2L_switch_End_Prob']=df['Llever_xxLL_goR_End']/(df['Llever_xxLL_goR_End']+df['Llever_xxLL_press_End']+df['Llever_xxLL_goL_End']+df['Llever_xxLL_goMag_End']+df['Llever_xxLL_other_End'])
+        df['mag_sss_start_End_Prob']=df['mag_ssss_goL_End']/(df['mag_ssss_nostart_End']+df['mag_ssss_goL_End'])
         all_test_variables={#'overstay':['Llever_xxLL_goR_End','Llever_xxLL_press_End','Llever_xxLL_goL_End'], #correct vs over-stay
                         #'B':['Rlever_LLRR_goMag_End','Rlever_LLRR_press_End','Rlever_LLRR_goR_End'], #correct vs stay
                         #'C':['Rlever_xLLR_press_End','Rlever_xLLR_goL_End'], #correct vs switch
                         #'premature':['Llever_xxRL_press_End','Llever_1L_goR_End'],#,'Rlever_1L_press_End'],
-                        #'start':['mag_----_goL_End', 'mag_----_nostart_End', ],# incorrect start
-                        'all_three':['Llever_xxLL_goR_End','Llever_xxRL_press_End','mag_----_goL_End']} 
-        for test_var in all_test_variables.values():
+                        #'start':['mag_ssss_goL_End', 'mag_ssss_nostart_End', ],# incorrect start
+                        'all_three':['mag_ssss_goL_End','Llever_1L_press_End','Llever_xxLL_goR_End'],
+                        'prob':['mag_sss_start_End_Prob','Llever_1L_press_End_Prob','Llever_2L_switch_End_Prob']} 
+        for kk,test_var in all_test_variables.items():
             mean,cnt,sterr=barplot_means(df,dep_var,test_var)
-            figBP=barplot(mean,sterr,test_var,dep_var[0],ylabel='Responses per Trial')
-            figBP=barplot(mean,sterr,test_var,dep_var[0],ylabel='Responses per Trial',transpose=True)
+            #figBP=barplot(mean,sterr,test_var,dep_var[0],ylabel='Responses per Trial')
+            if kk=='prob':
+                figBP=barplot(mean,sterr,test_var,dep_var[0],ylabel='Probability',transpose=True)
+            else:
+                figBP=barplot(mean,sterr,test_var,dep_var[0],ylabel='Responses per Trial',transpose=True)
     for tv in test_variables+test_var:
         new_dep_var=[]
         for dv in dep_var:
@@ -559,5 +568,5 @@ if __name__ == "__main__":
             model=ols(tv+model_statement,data=df).fit()
             print (tv, sm.stats.anova_lm (model, typ=2), '\n',model.summary())
             if len(dep_var)==1: 
-                print('post-hoc',sp.posthoc_ttest(df, val_col='rwd__End', group_col=dep_var[0], p_adjust='holm'))
+                print('post-hoc',sp.posthoc_ttest(df, val_col=tv, group_col=dep_var[0], p_adjust='holm'))
     

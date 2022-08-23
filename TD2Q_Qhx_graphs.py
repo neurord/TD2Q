@@ -246,10 +246,10 @@ def plot_Qhx_sequence_1fig(allQhx,plot_states,actions_colors,ept,actions_lines):
                             if ac != 'goMag':
                                 ax[axnum].plot(Xvals,Yvals,label=ac,color=color, linestyle=actions_lines[ac])
                         if col==0:
-                            ax[axnum].set_ylabel(','.join(list(plot_states[row])))
+                            ax[axnum].set_ylabel(','.join(list(plot_states[row])),fontsize=12)
                         ax[axnum].set_ylim([minQ,maxQ])
                         if row==len(plot_states)-1:
-                            ax[axnum].set_xlabel('Trial')
+                            ax[axnum].set_xlabel('Trial',fontsize=12)
     axis[1][1].legend(loc='upper right')
     for col in range(numcols):
         ylim=[axe.get_ylim() for axe in ax[col::3]]
@@ -455,7 +455,7 @@ if __name__ == "__main__":
     sequence=True
     if sequence:
         #fil={'1':'Sequence2021-12-16_HxLen4_numQ1_alpha0.2_0_st0.75_0_q2o0.1beta0.9splitTrue','2':'Sequence2021-12-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue'}
-        fil={'1':'Sequence2022-06-20_HxLen4_numQ1_alpha0.2_0_st0.75_0_q2o0.1beta0.9splitTrue','2':'Sequence2022-06-20_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue'}
+        fil={'1':'Sequence2022-08-10_HxLen4_numQ1_alpha0.2_0_st0.75_0_q2o0.1beta0.9splitTrue','2':'Sequence2022-08-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue'}
         figs={q:{} for q in fil.keys()}
         events_per_trial=7
         state_action_combos=[('Llever','RRLL'),('Rlever','LLLL'),('Rlever','RLLR'),('Rlever','RRLL')]
