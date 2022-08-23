@@ -230,8 +230,11 @@ if __name__ == "__main__":
     elif Hx_len==4:
         #MINIMUM actions for reward = 7, so maximum rewards = 1 per 7 "trials"
         state_action_combos=[(('Llever','**-L'), 'press'),(('Llever','**RL'), 'press'),(('Llever','**LL'), 'goR'),(('Rlever','**LL'),'press'),(('Rlever','*LLR'),'press'),(('Rlever','LLRR'),'goMag')]
-        overstay=[(('Llever','**LL'), 'goL'),(('Llever','**LL'), 'press'),(('Rlever','LLRR'),'goR'),(('Rlever','LLRR'),'press')]
-        premature=[(('Llever','**RL'), 'goR'),(('Rlever','**RL'), 'press'),(('Llever','**-L'), 'goR'),(('Rlever','**-L'), 'press'),(('Rlever','*LLR'),'goL'),(('Llever','*LLR'),'press')]
+        overstay=[(('Llever','**LL'), act) for act in ['goL','goMag','press','other']]+\
+            [(('Rlever','LLRR'),act) for act in ['goL','goR','press','other']]
+        premature=[(('Llever','**RL'), act) for act in ['goL','goR','goMag','other']]+\
+            [(('Llever','**-L'), act) for act in ['goL','goR','goMag','other']]+\
+            [(('Rlever','*LLR'), act) for act in ['goL','goR','goMag','other']]
         start=[(('mag','----'), act) for act in ['goL','goR','goMag','press','other']]
         state_action_combos=state_action_combos+overstay+premature+start
         sa_errors={'stay':overstay,'switch':premature,'start':start}
@@ -364,8 +367,9 @@ if __name__ == "__main__":
     rlu.plot_trajectory(output_data,title,[Qvalues])
     if plot_Qhx:
         plot_states=[('Llever','RRLL'),('Rlever','LLLL'),('Rlever','RLLR'),('Rlever','RRLL')]
+        actions_lines={a:'solid' for a in actions_colors.keys()}
         from TD2Q_Qhx_graphs import plot_Qhx_sequence, plot_Qhx_sequence_1fig
-        figs=plot_Qhx_sequence_1fig (all_Qhx,plot_states,actions_colors,events_per_trial)
+        figs=plot_Qhx_sequence_1fig (all_Qhx,plot_states,actions_colors,events_per_trial,actions_lines)
         #for numQ,Qhx in all_Qhx.items():
             #figs=plot_Qhx_sequence(Qhx,actions_colors,events_per_trial,numQ)
             #figs=plot_Qhx_sequence_1fig (Qhx,plot_states,actions_colors,events_per_trial)
