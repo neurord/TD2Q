@@ -9,6 +9,7 @@ import numpy as np
 def plot_trajectory(output_data,title,figure_sets):
     ############# Plots for publication ##########            
     from matplotlib import pyplot as plt
+    plt.ion()
     colors=plt.get_cmap('inferno') #plasma, viridis, inferno or magma possible
     #colors=['k','r','b','gray']
     for phases in figure_sets:
@@ -49,7 +50,8 @@ def plot_trajectory(output_data,title,figure_sets):
                     #    axis[ax].set_ylim([0,11])
                 axis[ax].legend()
         axis[-1].set_xlabel('block')
-    plt.show()
+    #plt.show()
+    return fig
 
 def save_results(results,key_dict,resultslist):  
     for phase in results.keys():
