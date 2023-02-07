@@ -72,14 +72,15 @@ class separable_T(Environment):
         env_state=self.state_from_number(self.state)[self.env_state_bits]
         if act==self.hx_act and env_state.endswith('lever'):
             new_presshx= self.T_for_action_hx(env_state[0])  #1st character of location part of state         
-            state_press=self.states['hx'][new_presshx] 
+            state_press=self.states['hx'][new_presshx] #go from press history to state number
         else:
-            state_press=self.state[1] #press_hx part of state
+            state_press=self.state[1] #press_hx part of state, doesn't change if no press
         newstate=(state_loc,state_press)
         #once reward is received, must scramble the press_hx to prevent agent from getting numerous rewards
         #this is kluge, to avoid enumerating all possible transitions
         if self.reward>0:
             newstate=self.start_state
+            self.pressHx=self.state_from_number(newstate)[1] 
         self.state=newstate
         #print('new state',self.state,self.state_from_number(self.state))
         return self.reward, self.state
