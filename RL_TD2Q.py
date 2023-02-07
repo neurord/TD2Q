@@ -110,20 +110,24 @@ class RL:
             act_results[sa[1]]['End']=self.results['action'][-event_subset:].count(anum)/trial_subset
             #Now, count how many times that state=state and action=action
             state=sa[0]
-            #state0num=self.env.states[self.env.state_types[0]][state[0]]
-            #state1num=self.env.states[self.env.state_types[1]][state[1]]
             statenum_list=[self.env.states[self.env.state_types[i]][state[i]] for i in range(len(state))]
             timeframe={'Beg':range(event_subset),'End':range(-event_subset,0)}
+            all_acts=np.array(self.results['action'])
             for tf,trials in timeframe.items():
-                sa_count=0
-                for tr in trials:
+                #sa_count=0
+                #Next two lines replace commented out looping over all trials. More efficient?
+                action_indices=np.where(all_acts[trials]==anum)[0]+trials[0]
+                new_count=len([tuple(x) for x in np.array(self.results['state'])[action_indices] if tuple(x)==tuple(statenum_list)])
+                '''for tr in trials:
                     #count number of times that agent state is state0 and state1
                     if self.results['action'][tr]==anum and \
-                        self.results['state'][tr]==tuple(statenum_list):#(state0num,state1num):
+                        self.results['state'][tr]==tuple(statenum_list):
                             #print(sa,tf,self.results['action'][tr],self.results['state'][tr],sa_count)
                             sa_count+=1
-                allresults[learn_phase][sa][tf].append(sa_count/trial_subset)#events per trial
-                #print(learn_phase,sa,tf,trials,sa_count)
+                if sa_count != new_count:
+                    print('results differ', sa_count,new_count)'''
+                allresults[learn_phase][sa][tf].append(new_count/trial_subset)#events per trial
+                #print(learn_phase,sa,tf,trials,new_count)
         result_str=' '.join([','+a+'= B:'+str(np.round(act_results[a]['Beg'],3))+
                              ',E:'+ str(np.round(act_results[a]['End'],3))
                              for a in np.unique(actions)])
@@ -145,13 +149,19 @@ class RL:
                 #state0num=self.env.states[self.env.state_types[0]][state[0]]
                 #state1num=self.env.states[self.env.state_types[1]][state[1]]
                 statenum_list=[self.env.states[self.env.state_types[i]][state[i]] for i in range(len(state))]
+                all_acts=np.array(self.results['action'])
                 block_count=[]
                 for block in range(num_blocks):
+                    trials=list(range(block*events_per_block,(block+1)*events_per_block))
+                    action_indices=np.where(all_acts[trials]==anum)[0]+trials[0]
+                    new_count=len([tuple(x) for x in np.array(self.results['state'])[action_indices] if tuple(x)==tuple(statenum_list)])
                     sa_count=0
-                    for tr in range(block*events_per_block,(block+1)*events_per_block):
+                    for tr in trials:
                         if self.results['action'][tr]==anum and\
                             self.results['state'][tr]==tuple(statenum_list):#(state0num,state1num):
                                 sa_count+=1
+                    if sa_count != new_count:
+                        print ('old',sa_count,'new',new_count)
                     block_count.append(sa_count)
                 traject[phase][sa].append(block_count)
         return traject
