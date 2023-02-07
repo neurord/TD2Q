@@ -6,10 +6,11 @@ Created on Wed Aug 19 12:12:28 2020
 """
 
 ############ reward   ################
-rwd={'error':-1,'reward':10,'base':-1,'none':0} 
+rwd={'error':-1,'reward':15,'base':-1,'none':0} 
 
 ######### Parameters for the agent ##################################
 params={}
+params['beta_GPi']=10
 params['wt_learning']=False
 params['wt_noise']=False #whether to multiply noise by learning_rate - not helpful
 params['numQ']=1
@@ -23,9 +24,9 @@ params['state_thresh']=[0.12,0.2] #similarity of noisy state to ideal state
 #possibly multiply state_thresh by learn_rate? to change dynamically?
 params['sigma']=0.25 #similarity of noisey state to ideal state,std used in Mahalanobis distance.
 params['time_inc']=0.1 #increment time since reward by this much in no reward
-params['moving_avg_window']=5 ##This in units of trials, the actual window is this times the number of events per trial
+params['moving_avg_window']=3 ##This in units of trials, the actual window is this times the number of events per trial
 params['decision_rule']=None #'combo', 'delta', 'sumQ2'
-params['Q2other']=0.05
+params['Q2other']=0.1
 params['forgetting']=0
 params['reward_cues']=None #options: 'TSR', 'RewHx3', 'reward'
 params['distance']='Euclidean'
@@ -80,6 +81,7 @@ if Hx_len==3:
             sequences['-'+c2+c3]=value
             value+=1
     sequences['---']=value
+    params['events_per_trial']=6
 elif Hx_len==4:
     for c1 in hx_values:
         for c2 in hx_values:
@@ -97,10 +99,10 @@ elif Hx_len==4:
                 sequences['-'+c2+c3+c4]=value
                 value+=1
     sequences['----']=value
+    params['events_per_trial']=7
 else:
     print('unanticipated Hx_len in press history')
-
-            
+           
 #create state dictionary
 states={'loc':{'mag':0,'Llever':1,'Rlever':2,'other':3},
         'hx': sequences} 

@@ -10,12 +10,13 @@ rwd={'error':-5,'reward':10,'base':-1,'none':0}
 
 ######### Parameters for the agent ##################################
 params={}
-params['wt_learning']=True
+params['wt_learning']=False
 params['wt_noise']=False #whether to multiply noise by learning_rate - not helpful
 params['numQ']=1
 params['alpha']=[0.3,0.06]  # learning rate 0.3 and 0.06 produce learning in 400 trials,#slower for Q2 - D2 neurons 
 params['beta']=0.9  # inverse temperature, controls exploration
 params['beta_min']=0.5
+params['beta_GPi']=10 #Should be similar to using max
 params['gamma']=0.9  #discount factor 
 params['hist_len']=40
 params['state_thresh']=[0.12,0.2] #similarity of noisy state to ideal state
@@ -23,13 +24,14 @@ params['state_thresh']=[0.12,0.2] #similarity of noisy state to ideal state
 #possibly multiply state_thresh by learn_rate? to change dynamically?
 params['sigma']=0.25 #similarity of noisey state to ideal state,std used in Mahalanobis distance.
 params['time_inc']=0.1 #increment time since reward by this much in no reward
-params['moving_avg_window']=5  #This in units of trials, the actual window is this times the number of events per trial
+params['moving_avg_window']=3  #This in units of trials, the actual window is this times the number of events per trial
 params['decision_rule']=None #'combo', 'delta', 'sumQ2', None ## None means use direct negative of D1 rule
-params['Q2other']=0.2
+params['Q2other']=0.1
 params['forgetting']=0
 params['reward_cues']=None ##options: 'TSR', 'RewHx3', 'reward', None
 params['distance']='Euclidean'
 params['split']=True
+params['events_per_trial']=3
 
 ############### Make sure you have all the state transitions needed ##########
 def validate_T(T,msg=''):
@@ -63,7 +65,7 @@ env_params={'start':start}
 loc=states['loc'] #used only to define R and T
 tone=states['tone'] #used only to define R and T
 move=['left','right','wander','center']
-stay=['groom','other','hold']
+stay=['groom','other','hold']# ['hold'] - if eliminate groom and other#
 
 Racq={};Tacq={}  #dictionaries to improve readability/prevent mistakes
 ####value of T dict is the new state
