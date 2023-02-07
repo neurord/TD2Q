@@ -51,6 +51,10 @@ class QL(Agent):
             self.beta_min = copy.copy(params['beta_min'])  #make this parameter.  If the same as params['beta'], beta doesn't vary
         else:
             self.beta_min=copy.copy(params['beta'])
+        if 'beta_GPi' in params.keys():
+            self.beta_GPi = copy.copy(params['beta_GPi'])
+        else:
+            self.beta_GPi=101 #use old rule of max prob determines action
         self.gamma = copy.copy(params['gamma'])  # discount factor - future anticipated rewards worth 10% less per time unit
         self.state_thresh=copy.copy(params['state_thresh'])
         self.time_increment=copy.copy(params['time_inc'])
@@ -63,6 +67,12 @@ class QL(Agent):
         self.min_learn_weight=0.1
         self.events_per_trial=copy.copy(params['events_per_trial'])
         self.distance=params['distance']
+        if 'use_OpAL' in params.keys():
+            self.use_OpAL = params['use_OpAL']
+            self.initQ=1
+        else:
+            self.use_OpAL=False 
+            self.initQ=0
         if 'Q2other' in params.keys():
             self.wt_Q2other=copy.copy(params['Q2other'])
         else:
@@ -86,6 +96,8 @@ class QL(Agent):
         if 'state_units' in params:
             self.state_units=[x for x in params['state_units'].values()]
         self.winner_count={k:0 for k in range(self.numQ)}
+        self.Da_factor=1 #2: increase Q0 effect (no inhibition of GPi) and decrease Q1 effect if D1-SPN inact
+
         #################### allocate Q table
         self.Q={}
         if len(oldQ):
@@ -103,6 +115,7 @@ class QL(Agent):
         self.cov={kk: {} for kk in range(self.numQ)}
         self.inv_cov_mat={kk: {} for kk in range(self.numQ)}
         self.det_cov={kk: {} for kk in range(self.numQ)}
+        self.RT=[]
         print('&&&&&&& END INIT &&&&&&&, alpha=', self.alpha, 'state_thresh=',self.state_thresh)
 
     def decode(self,nn,state):
@@ -123,7 +136,10 @@ class QL(Agent):
         #print('update_cov for Q',nn,',state',state_num,'cov',self.cov[nn][state_num])
         
     def extendQ(self,nn,numrows):
-        self.Q[nn]=np.vstack((self.Q[nn],np.zeros((numrows,self.Na))))
+        if self.initQ==0: 
+            self.Q[nn]=np.vstack((self.Q[nn],np.zeros((numrows,self.Na))))
+        else: ########### for OpAL
+            self.Q[nn]=np.vstack((self.Q[nn],np.ones((numrows,self.Na))))
         #print('Q extended. new shape',np.shape(self.Q[nn]))
 
     def splitQ(self,nn,Qrow):
@@ -133,7 +149,7 @@ class QL(Agent):
     def update_Qhx(self):
         for k in self.Qhx.keys():
             if np.shape(self.Qhx[k])[1]<np.shape(self.Q[k])[0]:
-                #first, axtend rows of Qhx so it matches Q
+                #first, extend rows of Qhx so it matches Q
                 dim0=np.shape(self.Qhx[k])[0]
                 dim1=np.shape(self.Qhx[k])[1]
                 dim2=np.shape(self.Qhx[k])[2]
@@ -159,7 +175,11 @@ class QL(Agent):
             for kk in range(self.numQ):
                 self.ideal_states[kk]={state_num:[si for si in state]+allcues }
                 self.Ns[kk]+=1
-            self.Q={kk:np.zeros((self.Ns[kk], self.Na)) for kk in range(self.numQ)}
+            if self.initQ==0:
+                self.Q={kk:np.zeros((self.Ns[kk], self.Na)) for kk in range(self.numQ)}
+            else: ############# for OpAL 
+                self.Q={kk:np.ones((self.Ns[kk], self.Na)) for kk in range(self.numQ)}
+                self.V=np.ones(self.Ns[kk])
         #nstate_types is len of list used to represent states
         self.nstate_types=len(self.ideal_states[0][state_num]) 
         #initalize weighting on noise as 1, update according to range of states values
@@ -185,7 +205,7 @@ class QL(Agent):
         #start by selecting state and action from Q[0]
         #Note, state is list - one state for each Q
         self.state=[self.ideal_states[kk][self.state_num[kk]] for kk in range(self.numQ)]
-        self.choose_act()#self.boltzmann( self.Q[0][self.state_num[0],:])
+        self.choose_act()
         print('>>>>> agent start: state=',self.state,self.state_num,', action=',self.action)
         # remember the state
         return self.action
@@ -303,30 +323,45 @@ class QL(Agent):
             print('###### END SELECT: Q',nn,'Acues,teststate, new state:',Acues,[round(ns,2) for ns in noisestate],newstate,', time since reward',self.time_since_reward)
         return newstate,newstate_num
     
-    def boltzmann(self, qval): #q must be an array or list of actions that can be taken
+    def boltzmann(self, qval,beta): #q must be an array or list of actions that can be taken
         """Boltzmann selection"""
-        pa = np.exp( self.beta*qval)   # unnormalized probability
+        pa = np.exp( beta*qval)   # unnormalized probability
         pa = pa/sum(pa)    # normalize
-        act=np.random.choice(self.Na, p=pa)
+        act=np.random.choice(len(qval), p=pa)
         actp=pa[act]
         return  act,actp#choose action randomly, with prob distr given by pa
     
-    def boltzman2Q(self,q1,q2):
+    def boltzman2Q(self,q1,q2,beta):
         #(soft) maximize over action: Q1(action) - Q2 (action)
         if self.decision_rule=='delta' :
-            deltaQ=q1-q2
+            deltaQ=q1-q2 #subtracting Q2 weights, as in Collins and Frank
         elif self.decision_rule=='sumQ2':
             deltaQ=q1-q2+np.sum(q2) #add Q2 val of all OTHER actions
         elif self.decision_rule=='combo':
             # Q1(action) - Q2 (action) + Q2[other actions)]
             deltaQ=q1-2*q2+np.sum(q2) 
-        pa=np.exp( self.beta*deltaQ)
-        act=np.random.choice(self.Na, p=pa/sum(pa))
+        if self.decision_rule=='mult': #doesn't work as well
+            p1=np.exp( beta*q1)
+            p2=np.exp( beta*(-q2))
+            pa=p1/sum(p1)+p2/sum(p2)
+        else:
+            pa=np.exp( beta*deltaQ)
+        act=np.random.choice(self.Na, p=pa/sum(pa))            
         return act
     
     def moving_average(self,x, w):
         return uniform_filter1d(x, w,origin=int(w/2)) #follows mean great, origin makes it causal
-    
+
+    def OpAL(self,reward,last_state_num):
+        #convert last_state_num into location, tone, context
+        #initialize self.V to state types?  list of lists :1 for statetype in state states in statetype
+        #delta=reward - (self.V[loctype,loc]+self.V[tonetype,tone]+self.V[contxttype,context])
+        #self.V[statetype,state] += self.gamma*delta.  gamma can have different values for different state types
+        delta=reward-self.V[last_state_num[0]]    #delta = reward - sum (self.V[bits])
+        self.V[self.state_num[0]] =self.V[self.state_num[0]] + self.gamma*delta #Value of nth bit updated by gamma * (reward - sum of Values)
+        self.Q[0][self.state_num[0],self.action]=self.Q[0][last_state_num[0],self.action](1+self.alpha[0]*delta)
+        self.Q[1][self.state_num[1],self.action]=self.Q[1][last_state_num[1],self.action](1-self.alpha[1]*delta)
+
     def D1_learn(self,reward,q,last_state_num,prn_info=False):      
         delta = reward + self.gamma*max(self.Q[q][self.state_num[q],:]) - self.Q[q][last_state_num[q],self.action]
         #if reward>0 or delta<5:
@@ -354,16 +389,15 @@ class QL(Agent):
                 self.Q[q][last_state_num[q],act]= (1-self.forgetting*self.alpha[q])*self.Q[q][last_state_num[q],act]
         return delta
     
-    def D2_learn(self,delta,q,last_state_num,prn_info=False,block_DA=False):
+    def D2_learn(self,delta,q,last_state_num,prn_info=False,block_DA=False,reward=None):
         ### DIFFERENT RULE for Q2 ####
-
-        #1. Invert the reward or the delta (implemented)
-        #2. Use the Q2 matrix to calculate delta, but use min instead of max
-        #  possibly use reward**(1/3) to compresses the range
-        #delta = reward + self.gamma*min(self.Q[q][self.state_num[q],:]) - self.Q[q][last_state_num[q],self.action]
+        #Invert the difference between current and prior Q
+        if reward and self.Q2other==0:  #delta from Q2 matrix only works if Q2other is zero
+            delta = reward - (0.5*self.gamma*min(self.Q[q][self.state_num[q],:]) - self.Q[q][last_state_num[q],self.action]) 
         '''
-        #3. compress the RPE instead of the reward?
-        delta2=-delta**(1/3)
+        #  possibly use reward**(1/3) to compresses the range,
+        #  compress the RPE instead of the reward?
+        delta2=delta**(1/3)
         '''
         #Change the Q value according to delta (calculated in D1_learn), but DECREASE Q2 when delta is positive
         #i.e., LTD if delta positive, LTP if delta negative (DA dip)
@@ -374,7 +408,7 @@ class QL(Agent):
             alpha=self.alpha[q]
         #use above alpha for both action taken and other actions
         if delta>0 or (delta<0 and not block_DA): #possibly change to if not block_DA
-            self.Q[q][last_state_num[q],self.action] -= alpha*delta #if you take best action but no reward, decrease value
+            self.Q[q][last_state_num[q],self.action] -= alpha*delta #if you take best action but no reward, decrease value (I.e., use -delta as in Collins and Frank)
 		#. change values for actions not taken - i.e., increase value of other actions
         #  If wt_Q2other=0, then this part does not happen
         #if (block_DA=='no_dip' and delta>0) or (block_DA=='AIP' and delta<0) or block_DA==False: #both types of heterosynaptic depression
@@ -389,19 +423,35 @@ class QL(Agent):
 		##       Consider LTD regardless of Da dip (delta)    
         return
 
+    def calc_RT(self,winning_prob):
+        #Params adjusted to reproduced latency range shown in Hamid ... Berke
+        RT0=1 #sec.  Collins used 5? Hamid shows latency as small as 2.3 sec
+        theta=0 #Collins 0
+        RTmax=8 #Collins 10
+        self.RT.append(RT0+RTmax/(1+np.exp(winning_prob-theta)))
+
     def choose_act(self,D1rule=False,prn_info=False):
-        self.action,act0prob = self.boltzmann( self.Q[0][self.state_num[0],:])
+        self.action,act0prob = self.boltzmann( self.Q[0][self.state_num[0],:],self.beta)
         winner='Q0'
         self.winner_count[0]+=1
+        winning_prob=act0prob
         if self.numQ>1:
-            if D1rule:
-                self.action2,act1prob = self.boltzmann( self.Q[1][self.state_num[1],:])
+            if D1rule: #never used?
+                self.action2,act1prob = self.boltzmann( self.Q[1][self.state_num[1],:],self.beta)
             else:
-                self.action2,act1prob = self.boltzmann( -self.Q[1][self.state_num[1],:])               
+                self.action2,act1prob = self.boltzmann( -self.Q[1][self.state_num[1],:],self.beta)               
             if self.action != self.action2:
                 if prn_info:
                     print('$$$$$$$ step, Q0 action,prob', self.action,round(act0prob,5), 'Q1 action,prob',self.action2,round(act1prob,5))
-                if act1prob>act0prob:
+                    if self.Da_factor!=1:
+                        print('act0,act1prob',act0prob,act1prob,'Da biased',act0prob*self.Da_factor,act1prob/self.Da_factor)
+                if self.beta_GPi>100: #arbitrary number indicating do use the max (old rule)
+                    action_set_index=np.argmax([act0prob*self.Da_factor,act1prob/self.Da_factor]) #max rule
+                    winning_prob=[act0prob,act1prob][action_set_index]
+                else:
+                    action_set_index,winning_prob=self.boltzmann(np.array([act0prob*self.Da_factor,act1prob/self.Da_factor]), self.beta_GPi)       
+                #if act1prob>act0prob: #rule used in 1st draft of TD2Q manuscript
+                if action_set_index==1:	
                     #print('$$$$$$$ step, Q1 action', self.action,round(act0prob,5), 'Q2 action',self.action2,round(act1prob,5))
                     self.action=self.action2 
                     winner='Q1'
@@ -409,6 +459,8 @@ class QL(Agent):
                     self.winner_count[0]-=1
             else:
                 winner='Q0act=Q1act'
+                winning_prob=np.max([act0prob,act1prob])
+            self.calc_RT(winning_prob)
         return winner
 
     def step(self, reward,state,noise,cues=[],prn_info=False,block_DA=False):
@@ -458,19 +510,22 @@ class QL(Agent):
         self.state_num=newstate_num
         #
         ############################# based on reward, update Q matrix ###############################
-        delta=self.D1_learn(reward,0,last_state_num,prn_info=False) #0 means update Q[0]
-        self.learn_hist['delta'].append(delta)
-        if self.numQ>1:
-            #self.D1_learn(reward,1,last_state_num,prn_info=False) #use same learning rule for Q0 and Q1 (D2 and D1)
-            #delta is the RPE = Da signal.  Cannot estimate it from Q2
-            #if block_DA: delta=0
-            self.D2_learn(delta,1,last_state_num,prn_info=False,block_DA=block_DA) #1 means update Q[1]
+        if self.use_OpAL:
+            self.OpAL(self,reward,last_state_num)
+        else:
+            delta=self.D1_learn(reward,0,last_state_num,prn_info=False) #0 means update Q[0]
+            self.learn_hist['delta'].append(delta)
+            if self.numQ>1:
+                #self.D1_learn(reward,1,last_state_num,prn_info=False) #use same learning rule for Q0 and Q1 (D2 and D1)
+                #delta is the RPE = Da signal.  Cannot estimate it from Q2
+                #if block_DA: delta=0
+                self.D2_learn(delta,1,last_state_num,prn_info=False,block_DA=block_DA) #1 means update Q[1] # use reward=reward and Q2other=0 to have different gamma for Q2
         self.update_Qhx()
         ####################### given the state, what is the best action?
         winner=self.choose_act() #use this rule if Q2 updated using D1_learn, or numQ==1
-        #Three other possible action selection rules
+        #Three other possible action selection rules - delta rule will overrule action chosen in self.choose_act
         if self.decision_rule!=None and self.numQ==2:            
-            self.action=self.boltzman2Q( self.Q[0][self.state_num[0],:],self.Q[1][self.state_num[1],:]) #this will replace action determined using choose_act
+            self.action=self.boltzman2Q( self.Q[0][self.state_num[0],:],self.Q[1][self.state_num[1],:],self.beta) #this will replace action determined using choose_act
         if prn_info:
             act_words=list(self.actions.keys())[list(self.actions.values()).index(self.action)]
             print('  END STEP: winner:',winner,', action',self.action,'=',act_words,', reward',reward)
