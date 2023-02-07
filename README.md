@@ -23,6 +23,7 @@ Q learning model with Q matrices representing dSPN and iSPN
     * AAB, ABA and ABB extinction and renewal, where A and B are contexts
 		
 - BanditTask.py
+	* also known as probabilistic serial reversal task
 	* parameters, including reward and transition matrix, in BanditTaskparam.py
 	* The 2-arm bandit task, from (start location, tone blip) the agent must go to the center poke port. 
 	* At the poke port, the agent hears a single tone (go cue) which contains no information about which port is rewarded. 
@@ -45,7 +46,8 @@ Q learning model with Q matrices representing dSPN and iSPN
 	environment in which every state is explicated
 	
 - sequence_env.py
-	environment used for large numbers of states, in which one type of state (e.g. press history) is independent of another type of state (e.g. location).  I.e., an agents action alters either press history or location, but not both.
+	environment used for large numbers of states, in which one type of state (e.g. press history) is independent of another type of state (e.g. location).  
+	I.e., an agents action alters either press history or location, but not both.
 	This simplifies specification of the transition matrix
 	
 - RL_class.py
@@ -58,24 +60,29 @@ Q learning model with Q matrices representing dSPN and iSPN
 	To analyze a large set of parameter sweep simulations
 
 - TD2Q_manuscript_graphs.py and TD2Q_Qhx_graphs.py
-	Used to create publication quality figures.
+	* Used to create publication quality figures (or panels to combine into figures using photoshop).
+	* Files to analyze are read in from banditFiles.py or discrimFiles.py or sequenceFiles.py
+
+- persever.py
+	* count how many times agent only makes 1 response, L or R, in probabilistic serial reversal, on the 50:50 block
+	* Also analyze how many times the prior block had best response the same as perseverant response
 
 **C. Parameters**
 - params['numQ']=1 #number of Q matrices.  numQ=2 is improves the 2-arm bandit task and sequence task.  No effect on discirmination/extinction
 - params['alpha']=[0.3,0.06]  # learning rate for Q1 and (optionally Q2) matrices.  Task dependent
-- params['beta']=0.9  # maximum value of inverse temperature, controls exploration-exploitation
+- params['beta']=1.5  # maximum value of inverse temperature, controls exploration-exploitation
 - params['beta_min']=0.5 # minimum value of inverse temperature, controls exploration
 - params['gamma']=0.9  #discount factor
 - params['hist_len']=40 #update covariance matrix and ideal states of agents as average of this many events
 - params['state_thresh']=[0.12,0.2] #threshold distance of input state to ideal state. Task and distance measure dependent 
 - params['sigma']=0.25 #std used in Mahalanobis distance.
-- params['moving_avg_window']=5 #This in units of trials, the actual window is this times the number of events per trial.  It is used to calculate reward probability
+- params['moving_avg_window']=3 #This in units of trials, the actual window is this times the number of events per trial.  It is used to calculate reward probability
 - params['decision_rule']
   * None: choose action based on Q1 and Q2, then resolve difference
   * 'delta': choose action based on difference between Q1 and Q2 matrix
-- params['Q2other']=0.1 #fractional learning rate (multiplied by alpha) for Q2 values for NON-selected actions
+- params['Q2other']=0.0 #fractional learning rate (multiplied by alpha) for Q2 values for NON-selected actions, i.e. heterosynaptic plasticity
 - params['distance']='Euclidean' #determine best matching state based on Euclidean distance, alternative: "Gaussian": mahalanobis distance
-- params['split']=True #initialize new row of Q matrix as values of best matching state or as zeros.  
+- params['split']=True #initialize new row of Q matrix as values of best matching state (if False, initialize to zero).  
 
 
 

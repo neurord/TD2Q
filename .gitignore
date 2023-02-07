@@ -1,4 +1,5 @@
 *.npz
+*.npy
 *.png
 *.pyc
 *.slurm
@@ -11,3 +12,4 @@
 *.xlsx
 NormEuclidPLoSsubmission2_Q2other0/*
 NormEuclidPLoSsubmission1/*
+Euclid/*
