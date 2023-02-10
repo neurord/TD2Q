@@ -48,7 +48,7 @@ elif submission==2:
     elif test=='split':
         keys=['split','no split']
         files=[ subdir0+'Bandit2023-01-10numQ2_Q2other0.0_beta_GPi10_decision_ruleNone_beta_min0.5_beta1.5_gamma0.82_splitTrue.npz',
-                'Bandit2023-01-17numQ2_Q2other0.0_beta_GPi10_decision_ruleNone_beta_min0.5_beta1.5_gamma0.82_splitFalse.npz']
+                subdir0+'Bandit2023-01-17numQ2_Q2other0.0_beta_GPi10_decision_ruleNone_beta_min0.5_beta1.5_gamma0.82_splitFalse.npz']
     elif test=='gamma':
         pattern=subdir0+'Bandit2023-01-10numQ2*decision_ruleNone_beta_min0.5_beta1.5_gamma*_splitTrue.npz'
     elif test=='beta':
