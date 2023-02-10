@@ -12,7 +12,9 @@ import completeT_env as tone_discrim
 import agent_twoQtwoSsplit as QL
 from RL_TD2Q import RL
 import RL_utils as rlu
-    
+import copy
+from TD2Q_Qhx_graphs import Qhx_multiphase
+
 def select_phases(block_DA_dip,PREE,savings,extinct,context,action_items):
     acq_cue=context[0]#use [] for no cues
     ext_cue=context[1] #1 for extinction in separate context
@@ -65,9 +67,28 @@ def select_phases(block_DA_dip,PREE,savings,extinct,context,action_items):
                        'discrim':action_items[1:]+['rwd'],'reverse':action_items[1:]+['rwd']}
     return learn_phases,figure_sets,traject_items,acq_cue,ext_cue,ren_cue,dis_cue,ren_cue,acq2_cue
 
+def respond_decay(phases,state_act, output_data):
+    half={phs:[] for phs in phases};half_block={phs:[] for phs in phases}
+    for phs in phases:
+        all_data=output_data[phs][state_act]
+        mean_traject=np.mean(all_data,axis=0)
+        for data in all_data:
+            half[phs].append((np.max(data)+np.min(data))/2)
+            if mean_traject.argmax()>mean_traject.argmin():
+                h=np.where(data>half[phs][-1])
+            else:
+                h=np.where(data<half[phs][-1])
+            if len(h[0]):
+                half_block[phs].append(np.min(h))
+            else:
+                half_block[phs].append(np.nan)
+        print(phs,'half responding=',np.nanmean(half[phs]),'block=',np.nanmean(half_block[phs]))
+    return half,half_block
+
 ####################################################################################################################
 if __name__ == "__main__":
-    events_per_trial=3  #this is task specific
+    from DiscriminationTaskParam2 import params,states,act
+    events_per_trial=params['events_per_trial']  #this is task specific
     trials=200 #Iino: 180 trials for acq, then 160 trials for discrim; or discrim from the start using 60 trials of each per day (120 trials) * 3 days
     numevents= events_per_trial*trials
     runs=10 #10 for paper
@@ -89,7 +110,7 @@ if __name__ == "__main__":
     action_items=[(('start','blip'),'center'),(('Pport','6kHz'),'left'),(('Pport','6kHz'),'right'),(('Pport','10kHz'),'left'),(('Pport','10kHz'),'right')]
     #action_items=['center','left','right']
 
-    block_DA_dip=False#'AIP' #AIP means block all change in Q2 values, no_dip means block decreases, not increases, False - control
+    block_DA_dip=False #'AIP' #AIP or no_dip blocks homosynaptic LTP, no_dip blocks heterosynaptic LTD, False - control
     PREE=0
     savings='none'#''none'#'in new context'# 'after extinction'##'none'# #- for simulating discrim and reverse
     extinct='none' #AAB: aquire and extinguish in A, try to renew in B; ABB: aquire in A, extinguish in B, re-test renewal in B
@@ -106,15 +127,16 @@ if __name__ == "__main__":
         state_sets=[[('Pport','6kHz'),('Pport','10kHz')],[('Pport','6kHz')]]
         phases=[['acquire','discrim','reverse'],['acquire','extinc','renew']] 
     trial_subset=int(0.1*numevents) #display mean reward and count actions over 1st and last of these number of trials 
-    from DiscriminationTaskParam2 import params,states,act
     #update some parameters of the agent
-    params['decision_rule']=None#'delta' #'delta' #'combo', , 'sumQ2', None means use direct negative of D1 rule
-    params['Q2other']=0.1
+    params['decision_rule']=None #'mult' #'delta' #  #'combo','sumQ2', None means use direct negative of D1 rule
+    params['Q2other']=0.0
     params['numQ']=2
-    params['events_per_trial']=events_per_trial
     params['wt_learning']=False
     params['distance']='Euclidean'
-    params['beta_min']=0.5#params['beta'] #
+    params['beta_min']=0.5
+    params['beta']=1.5
+    params['beta_GPi']=10
+    params['gamma']=0.82
     params['state_units']['context']=False
     if params['distance']=='Euclidean':
         #state_thresh={'Q1':[0.875,0],'Q2':[0.875,1.0]} #For Euclidean distance
@@ -130,7 +152,20 @@ if __name__ == "__main__":
     params['alpha']=alpha['Q'+str(params['numQ'])] #  
     params['split']=True #if False - initialize new row in Q matrix to 0; if True - initialize to Q values of best matching state   
     traject_title='num Q: '+str(params['numQ'])+' rule:'+str( params['decision_rule'])+' forget:'+str(params['forgetting'])
-
+    ################# For OpAL ################
+    params['use_Opal']=False
+    if params['use_Opal']:
+        params['numQ']=2
+        params['Q2other']=0
+        params['decision_rule']='delta'
+        params['alpha']=[0.1,0.1]#[0.2,0.2]#
+        params['beta_min']=1
+        params['beta']=1
+        params['gamma']=0.1 #called alpha_c in OpAL
+        params['split']=False #### initialize all new states to 1
+        params['use_Opal']=True
+        params['state_thresh']=[0.75,0.625]
+    ######################################
     from DiscriminationTaskParam2 import Racq,Tacq,env_params
     epochs=['Beg','End']
     
@@ -143,6 +178,7 @@ if __name__ == "__main__":
     traject_dict={phs:{ta:[] for ta in traject_items[phs]} for phs in learn_phases}
     #count number of responses to the following actions:
     results={phs:{a:{'Beg':[],'End':[]} for a in action_items+['rwd']} for phs in learn_phases}
+    Qhx_actions=['left','right'] #actions of interest for Qhx
     
     ### to plot performance vs trial block
     trials_per_block=10
@@ -154,7 +190,7 @@ if __name__ == "__main__":
     resultslist['params']={p:[] for p in params.keys()} 
     all_beta={'_'.join(k):[] for k in phases}
     all_lenQ={k:{q:[] for q in range(params['numQ'])} for k in all_beta.keys()}
-    #all_Qhx=[]; all_bounds=[]; all_ideals=[]
+    all_Qhx=[];all_bounds=[];all_ideals=[]
 
     for r in range(runs):
         rl={}
@@ -215,6 +251,19 @@ if __name__ == "__main__":
             print ('>>>>>>>>>>>>>>>>>>>> savings', savings,'acq2 cue',acq2_cue)
         all_beta,all_lenQ=rlu.beta_lenQ(rl,phases,all_beta,all_lenQ,params['numQ'])
 
+        agents=[[rl[phs] for phs in phaseset] for phaseset in phases]
+        one_Qhx={q:{} for q in range(params['numQ'])};one_ideals={q:{} for q in range(params['numQ'])};one_bounds={q:{} for q in range(params['numQ'])}
+        for ij,(state_subset,phase_set,agent_set) in enumerate(zip(state_sets,phases,agents)):
+            Qhx, boundaries,ideal_states=Qhx_multiphase(state_subset,Qhx_actions,agent_set,params['numQ'])
+            for q in Qhx.keys():
+                for st in Qhx[q].keys():
+                    newstate=','.join(list(st))
+                    one_Qhx[q][newstate+' '+str(ij)]=copy.deepcopy(Qhx[q][st])
+                    one_ideals[q][newstate+' '+str(ij)]=copy.deepcopy(ideal_states[q][st])
+                    one_bounds[q][newstate+' '+str(ij)]=copy.deepcopy(boundaries[q][st])
+        all_Qhx.append(one_Qhx)
+        all_ideals.append(one_ideals)
+        all_bounds.append(one_bounds)
 ######### Average over runs, also need stdev.  
     all_ta=[]; output_data={}
     for phs in traject_dict.keys():
@@ -241,35 +290,23 @@ if __name__ == "__main__":
     print('counts from ',trial_subset,' events (',events_per_trial,' events per trial)          BEGIN    END    std over ',runs,'runs')
     for phase in results.keys():
         for sa,counts in results[phase].items():
-            print(phase.rjust(12), sa,':::',np.round(np.mean(counts['Beg']),1),'+/-',np.round(np.std(counts['Beg']),2),
-                  ',', np.round(np.mean(counts['End']),1),'+/-',np.round(np.std(counts['End']),2))
+            print(phase.rjust(12), sa,':::',np.round(np.mean(counts['Beg']),2),'+/-',np.round(np.std(counts['Beg']),2),
+                  ',', np.round(np.mean(counts['End']),2),'+/-',np.round(np.std(counts['End']),2))
         for sa in interesting_combos[phase]:
             if sa in resultslist[phase]:
                 print( '            ',sa,':::',[round(val,3) for lst in resultslist[phase][sa] for val in lst] )
-    rlu.plot_trajectory(output_data,traject_title,figure_sets)
+    trajectfig=rlu.plot_trajectory(output_data,traject_title,figure_sets)
     print('******* winner count, 1st run *****')
     for phase,ag in rl.items():     
         print(phase,[(wck,np.sum(wcvals)) for wck,wcvals in ag.agent.winner_count.items()])
     if plot_Qhx==2:
         ########## Plot Q values over time 
         ### A. Qhx_multiphase plots only select state/actions, and concatenates multiple learning phases
-        from TD2Q_Qhx_graphs import Qhx_multiphase, plot_Qhx_2D     
+        from TD2Q_Qhx_graphs import plot_Qhx_2D     
         ########################## NEXT:
-        import copy
-        actions=['left','right']
-        agents=[[rl[phs] for phs in phaseset] for phaseset in phases]
-        all_Qhx={q:{} for q in range(params['numQ'])};all_bounds={q:{} for q in range(params['numQ'])};all_ideals={q:{} for q in range(params['numQ'])}
         for ij,(state_subset,phase_set,agent_set) in enumerate(zip(state_sets,phases,agents)):
-            Qhx, boundaries,ideal_states=Qhx_multiphase(state_subset,actions,agent_set,params['numQ'])
             fig=plot_Qhx_2D(Qhx,boundaries,events_per_trial,phase_set,ideal_states)
-            for q in Qhx.keys():
-                for st in Qhx[q].keys():
-                    newstate=','.join(list(st))
-                    all_Qhx[q][newstate+' '+str(ij)]=copy.deepcopy(Qhx[q][st])
-                    all_ideals[q][newstate+' '+str(ij)]=copy.deepcopy(ideal_states[q][st])
-                    all_bounds[q][newstate+' '+str(ij)]=copy.deepcopy(boundaries[q][st])
-        fig=plot_Qhx_2D(all_Qhx,all_bounds,events_per_trial,phases,all_ideals) #fig 3
-
+        fig=plot_Qhx_2D(all_Qhx[0],all_bounds[0],events_per_trial,phases,all_ideals[0]) #fig 3
     elif plot_Qhx==3: 
         ### B. 3D plot Q history for selected actions, for all states, one graph per phase
         for phase in ['discrim','reverse']:
@@ -284,7 +321,8 @@ if __name__ == "__main__":
         dt=datetime.datetime.today()
         date=str(dt).split()[0]
         fname=fname+date+'_numQ'+str(params['numQ'])+'_alpha'+'_'.join([str(a) for a in params['alpha']])\
-        +'_st'+'_'.join([str(st) for st in params['state_thresh']])+'_q2o'+str(params['Q2other'])+'_beta'+str(params['beta_min'])+'_split'+str(params['split'])
+        +'_st'+'_'.join([str(st) for st in params['state_thresh']])+'_q2o'+str(params['Q2other'])+'_gamma'+str(params['gamma'])+\
+            '_bmin'+str(params['beta_min'])+'_bmax'+str(params['beta'])+'_split'+str(params['split'])+'_rule'+str(params['decision_rule'])
         np.savez(fname,par=params,results=resultslist,traject=output_data)
         if plot_Qhx==2:
             np.savez('Qhx'+fname,all_Qhx=all_Qhx,all_bounds=all_bounds,events_per_trial=events_per_trial,phases=phases,all_ideals=all_ideals,all_beta=all_beta,all_lenQ=all_lenQ)
@@ -300,3 +338,17 @@ if __name__ == "__main__":
         all_labels={i:rl['discrim'].state_to_words(i,noise,chars=numchars) for i in range(params['numQ'])}
         actions=rl['discrim'].agent.actions
         np.savez('staticQ'+fname,allQ=allQ,labels=all_labels,actions=actions,state_subset=[ss[0:numchars] for ss in select_states])
+    
+    if not block_DA_dip:
+        print('beta_min',params['beta_min'],'beta_max',params['beta'],'beta_GPi',params['beta_GPi'],'rwd',\
+            np.mean(results['acquire']['rwd']['End'])+np.mean(results['discrim']['rwd']['End'])+np.mean(results['reverse']['rwd']['End']) )
+
+        ############## Evaluate decay of responding #####################
+        state_act=(('Pport','6kHz'),'left') #
+        half,half_block=respond_decay(['acquire','extinc','renew'],state_act,traject_dict)
+        #identify which panel for plotting fit
+        ax=[a for a in trajectfig.axes if 'Ppor' in a.get_ylabel() and '6kHz' in a.get_ylabel()]
+        symbols={'acquire':'o','extinc':'d','renew':'X'}
+        for jj,(key,x) in enumerate(half_block.items()):
+            ax[0].scatter(np.mean(x),np.mean(half[key]),marker=symbols[key],color=ax[0].get_lines()[3*jj].get_c())
+
