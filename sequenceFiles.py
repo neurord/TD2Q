@@ -40,7 +40,7 @@ if submission==1:
     fil={'1':'Sequence2022-08-10_HxLen4_numQ1_alpha0.2_0_st0.75_0_q2o0.1beta0.9splitTrue','2':'Sequence2022-08-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue'}
     
 elif submission==2:
-    subdir0='NormEuclidPLoSsubmission2_Q2other0/' #q2other=0.0
+    subdir0='ManuscriptFiles/'#'NormEuclidPLoSsubmission2_Q2other0/' #q2other=0.0
     param_name='par'
     test='numQ' #'inact'#'gamma'#'beta' #'Q2other'#
     testsplit=True
@@ -57,13 +57,11 @@ elif submission==2:
         dep_var=['inact'] #using Q2other0.1, D2 had factor=0.6, D1 had factor=2
         #test_variables=test_variables+['Llever_**LL_goR_End'.replace('*','x'), 'Rlever_*LLR_press_End'.replace('*','x'),'Rlever_xxLL_press_End','Rlever_LLRR_goMag_End']
         #dep_var=['numQ'] #'split','beta_min']#, 'Q2other','split','beta_min'] #'trial_subset']# 'decision_rule']#
-        files=[subdir0+'Sequence2023-01-04numQ2_Q1other0.0_beta_GPi10_decision_ruleNone_beta_min0.5_beta3_gamma0.9_0.45_rwd15_splitTrue.npz', #D2 gamma=0.5*D1 gamma, inact effect on final choice
-               subdir0+'Sequence2023-01-04numQ2_Q2other0.0_beta_GPi10_decision_ruleNone_beta_min0.5_beta3_gamma0.9_0.45_rwd15_splitTrue.npz'] #D2 gamma=0.5*D1 gamma, inact effect on final choice
+        files=[subdir0+'Sequence2023-01-17numQ1_Q2other0.0_beta_GPi10_decision_ruleNone_beta_min0.5_beta3_gamma0.95_rwd15_splitTrue.npz',
+               subdir0+'Sequence2023-01-17numQ2_Q2other0.0_beta_GPi10_decision_ruleNone_beta_min0.5_beta3_gamma0.95_rwd15_splitTrue.npz']
         barplot_files=[subdir0+'Sequence2023-01-17numQ2_Q2other0.0_beta_GPi10_decision_ruleNone_beta_min0.5_beta3_gamma0.95_rwd15_splitTrue.npz',#
                 subdir0+'Sequence2023-01-17numQ2_Q2other0.0_beta_GPi10_decision_ruleNone_beta_min0.5_beta3_gamma0.95_rwd15_splitTrue_inactiveD1_2.npz', 
                 subdir0+'Sequence2023-01-17numQ2_Q2other0.0_beta_GPi10_decision_ruleNone_beta_min0.5_beta3_gamma0.95_rwd15_splitTrue_inactiveD2_0.5.npz'] 
-        files=[subdir0+'Sequence2023-01-17numQ1_Q2other0.0_beta_GPi10_decision_ruleNone_beta_min0.5_beta3_gamma0.95_rwd15_splitTrue.npz', #D2 gamma=0.5*D1 gamma, inact effect on final choice
-               subdir0+'Sequence2023-01-17numQ2_Q2other0.0_beta_GPi10_decision_ruleNone_beta_min0.5_beta3_gamma0.95_rwd15_splitTrue.npz'] #D2 gamma=0.5*D1 gamma, inact effect on final choice
         pattern=subdir0+'Sequence2023-01-17numQ2_Q2other0.0_beta_GPi10_decision_ruleNone_beta_min0.5_beta3_gamma0.95_rwd15_splitTrue*'
         '''######### effect of Q2other
         pattern='Sequence2022-12-??numQ2_Q2other0.?_beta_GPi10_decision_ruleNone_beta_min0.5_beta3_gamma0.9_rwd15_splitTrue.npz'
@@ -89,7 +87,8 @@ elif submission==2:
                         files=files+splitfalse
                         dep_var=dep_var+['split']
         elif test=='gamma':        #test gamma
-                pattern=subdir0+'Sequence2023-01-10numQ2_Q2other0.0_decision_ruleNone_beta3_beta_min0.5_gamma*_beta_GPi10_rwd15_splitTrue*'
+                pattern=subdir0+'Sequence2023-01-10numQ1_Q2other0.0_decision_ruleNone_beta3_beta_min0.5_gamma*_beta_GPi10_rwd15_splitTrue*'
+                #pattern=subdir0+'Sequence2023-01-10numQ2_Q2other0.0_decision_ruledelta_beta3_beta_min0.5_gamma*_beta_GPi10_rwd15_splitTrue*'
         elif test=='beta':        #test beta
                 pattern=subdir0+'Sequence2023-01-11numQ2_Q2other0.0_decision_ruleNone_beta*_beta_min0.5_gamma0.95_beta_GPi10_rwd15_splitTrue*'
         elif test=='Q2other':

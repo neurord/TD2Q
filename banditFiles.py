@@ -29,7 +29,7 @@ if submission==1:
     fil={'2':'Bandit2022-06-03_numQ2_alpha0.4_0.2_q2o0.1_beta0.1_splitTrue_window3'}#'Bandit2021-12-16_numQ2_alpha0.4_0.2_q2o0.1_beta0.9_splitTrue'} #}
 
 elif submission==2:
-    subdir0='NormEuclidPLoSsubmission2_Q2other0/' #q2other=0.0
+    subdir0='ManuscriptFiles/'#'NormEuclidPLoSsubmission2_Q2other0/' #q2other=0.0
     test='numQ' #'beta'#'gamma' #'split'#,'beta_min', 'decision_rule' 'AIP' 'Q2other'#
     dep_var=[test]
     files=None
@@ -43,12 +43,12 @@ elif submission==2:
              '2':subdir0+'Bandit2023-01-10numQ2_Q2other0.0_beta_GPi10_decision_ruleNone_beta_min0.5_beta1.5_gamma0.82_splitTrue'}
         files=[ subdir0+'Bandit2023-01-17numQ1_Q2other0.0_beta_GPi10_decision_ruleNone_beta_min0.5_beta1.5_gamma0.82_splitTrue.npz',
                 subdir0+'Bandit2023-01-10numQ2_Q2other0.0_beta_GPi10_decision_ruleNone_beta_min0.5_beta1.5_gamma0.82_splitTrue.npz']
-        files=[subdir0+'Bandit2023-01-17numQ1_Q2other0.0_beta_GPi10_decision_ruleNone_beta_min0.5_beta1.5_gamma0.82_splitTruesimple.npz',
-                subdir0+'Bandit2023-01-17numQ2_Q2other0.0_beta_GPi10_decision_ruleNone_beta_min0.5_beta1.5_gamma0.82_splitTruesimple.npz']
+        #files=[subdir0+'Bandit2023-01-17numQ1_Q2other0.0_beta_GPi10_decision_ruleNone_beta_min0.5_beta1.5_gamma0.82_splitTruesimple.npz',
+        #        subdir0+'Bandit2023-01-17numQ2_Q2other0.0_beta_GPi10_decision_ruleNone_beta_min0.5_beta1.5_gamma0.82_splitTruesimple.npz']
     elif test=='split':
         keys=['split','no split']
         files=[ subdir0+'Bandit2023-01-10numQ2_Q2other0.0_beta_GPi10_decision_ruleNone_beta_min0.5_beta1.5_gamma0.82_splitTrue.npz',
-                'Bandit2023-01-17numQ2_Q2other0.0_beta_GPi10_decision_ruleNone_beta_min0.5_beta1.5_gamma0.82_splitFalse.npz']
+                subdir0+'Bandit2023-01-17numQ2_Q2other0.0_beta_GPi10_decision_ruleNone_beta_min0.5_beta1.5_gamma0.82_splitFalse.npz']
     elif test=='gamma':
         pattern=subdir0+'Bandit2023-01-10numQ2*decision_ruleNone_beta_min0.5_beta1.5_gamma*_splitTrue.npz'
     elif test=='beta':

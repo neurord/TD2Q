@@ -40,7 +40,7 @@ if submission==1:
              '2':'Discrim2022-06-14_numQ2_alpha0.2_0.1_st0.75_0.625_q2o0.1_beta0.5_splitTrue' }
 
 elif submission==2:
-    subdir0='NormEuclidPLoSsubmission2_Q2other0/' #q2other=0.0
+    subdir0='ManuscriptFiles/'#'NormEuclidPLoSsubmission2_Q2other0/' #q2other=0.0
     test='numQ'# 'beta'#'AIP' #'split'#'gamma' #'beta_min',  'decision_rule' 
     test_variables=['rwd__End']
     dep_var=[test]
