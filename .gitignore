@@ -1,5 +1,5 @@
-*.npz
-*.npy
+#*.npz
+#*.npy
 *.png
 *.pyc
 *.slurm
@@ -13,3 +13,9 @@
 NormEuclidPLoSsubmission2_Q2other0/*
 NormEuclidPLoSsubmission1/*
 Euclid/*
+GausMix/*
+NormEuclid2021dec3/*
+NormEuclid2021dec10/*
+ManuscriptFiles/Sequence*.npz
+
+
