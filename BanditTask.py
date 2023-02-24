@@ -263,7 +263,7 @@ if __name__ == '__main__':
         extra_acts=[]
     else:
         extra_acts=['hold', 'wander']
-    extra_acts=['hold']
+    #extra_acts=['hold'] for simpler 3 step task
     for key,counts in all_counts.items():
         for phase in learn_phases:
             counts[phase]={'stay':[0]*runs,'shift':[0]*runs}
@@ -343,7 +343,7 @@ if __name__ == '__main__':
     print('\n************ fraction Left ***************')
     fractionLeft,noL,noR,ratio=calc_fraction_left(traject_dict,runs)
     import persever as p
-    persever,prior_phase=p.perseverance(traject_dict,runs,random_order,'50:50')
+    perseve,prior_phase=p.perseverance(traject_dict,runs,random_order,'50:50')
     for k in fractionLeft.keys():
         print(k,round(ratio[k],2),'mean Left',round(np.nanmean(fractionLeft[k]),2), 
         ', std',round(np.nanstd(fractionLeft[k]),2), '::: trials with: no response', fractionLeft[k].count(np.nan), 
@@ -366,7 +366,7 @@ if __name__ == '__main__':
         date=str(dt).split()[0]
         key_params=['numQ','Q2other','beta_GPi','decision_rule','beta_min','beta','gamma']
         fname_params=key_params+['split']
-        fname='Bandit'+date+'_'.join([k+str(params[k]) for k in fname_params])+'simple'#+'300trials'#+'_1step'
+        fname='Bandit'+date+'_'.join([k+str(params[k]) for k in fname_params])#+'simple'#+'300trials'#+'_1step'
         #np.savez(fname,par=params,results=resultslist,traject=output_data)
         np.savez(fname,par=params,results=resultslist,traject=output_data,traject_dict=traject_dict,shift_stay=all_counts)
         #SPLIT: Rwd: 22.59 +/- 5.75, RMS= 0.6792 +/- 0.1611
