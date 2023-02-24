@@ -355,11 +355,11 @@ def calc_norm(params,percent=False):
 
 if __name__ == "__main__":
     #for stats, only run one at a time
-    task= 'bandit'#'discrim' # 'block_da'#'sequence' # 
+    task= 'bandit'# 'discrim' #'AIP'# 'sequence' #
     add_barplot=0 #only relevant for sequence
     shift_stay=0 #only relevant for bandit
     test_var=[]
-    traject_fig=False
+    traject_fig=True
     ######################### DISCRIM #########################
     if task=='discrim':
         from discrimFiles import pattern,dep_var,files,test_variables,actions,action_text,keys
@@ -390,7 +390,7 @@ if __name__ == "__main__":
                 axis.set_xlim(xlim)
 
     ######################### block Dopamine #########################
-    elif task=='block_da':
+    elif task=='AIP':
         from discrimFiles import pattern,dep_var,files,test_variables,actions,action_text,keys
         print(actions)
         traject,_,_,params,_=read_data(pattern, files, keys) 
@@ -425,7 +425,7 @@ if __name__ == "__main__":
     #################### Bandit Task Probabilities ##################
     elif task=='bandit':
         from banditFiles import pattern,dep_var,files,test_variables,actions,action_text,keys
-        from BanditTask import calc_fraction_left,plot_prob_tracking,plot_prob_traject,perseverance
+        from BanditTask import calc_fraction_left,plot_prob_tracking,plot_prob_traject
         runs=40
         colors2=[plt.get_cmap('seismic').__call__(c) for c in [18,50]]+[plt.get_cmap('hsv').__call__(c) for c in [188,204,225]]+[plt.get_cmap('seismic').__call__(c) for c in [192,242]]
         newcol={'2':colors2,'1':colors2}
@@ -467,7 +467,7 @@ if __name__ == "__main__":
     import os
 
     df=create_df(pattern,files=files,params=dep_var)
-    if task=='block_da':
+    if task=='AIP':
         df=create_df(pattern,files=files,params=dep_var,keys=keys)
     if 'Bandit' in pattern:
         key1=list(traject.keys())[0]
@@ -483,7 +483,7 @@ if __name__ == "__main__":
         df['RMS']=np.sqrt(df['sum_squares'])
         df['mean_reward']=df.loc[:,test_variables].mean(axis=1)
         test_variables=['mean_reward','RMS']
-    if os.path.basename(pattern).upper().startswith('DISCRIM') and task != 'block_da':
+    if os.path.basename(pattern).upper().startswith('DISCRIM') and task != 'AIP':
         df['mean_reward']=df.loc[:,['reverse_rwd__End','discrim_rwd__End']].mean(axis=1)
         test_variables=['mean_reward','acquire_rwd__End','reverse_rwd__End','discrim_rwd__End']
         if 'split' in dep_var:
@@ -498,7 +498,8 @@ if __name__ == "__main__":
     np.savetxt(textname,np.column_stack((rows*3,np.vstack([cnt,round(mean,3),round(sterr,3)]))),fmt='%s',header=header,comments='') #Ttest tables/Fig 5 - Igor
     if task=='bandit':
         newtv= [k+'_probL' for k in ['90:10','90:50','50:10', '50:50','10:50','50:90','10:90']] 
-        print(df.groupby(dep_var)[newtv].mean())
+        print('means for Fig 6B',df.groupby(dep_var)[newtv].mean())
+        print('sterr for Fig 6B',df.groupby(dep_var)[newtv].sem())
         if 'numQ' in dep_var:
             print('******** Ttest on entire trial RMS, numQ:', ttest_ind(RMS['1'],RMS['2'],equal_var=False))
     if task=='sequence' and add_barplot:
@@ -542,7 +543,7 @@ if __name__ == "__main__":
         if testdf[dep_var].nunique().sum()==2:
             unique_vals=np.unique(testdf[dep_var[0]])
             tt=ttest_ind(testdf[testdf[dep_var[0]]==unique_vals[0]][tv], testdf[testdf[dep_var[0]]==unique_vals[1]][tv], equal_var=False)
-            print('\n*******',tv,'\n',tt)      
+            print('\n*******',tv,'\n',tt,'\n mean:\n',mean[tv],'\n sterr:\n',sterr[tv])      
         else:
             dependents=['C('+dv+')' for dv in dep_var]
             model_statement=' ~ '+'+'.join(dependents)
