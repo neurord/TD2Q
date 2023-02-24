@@ -519,7 +519,7 @@ def load_data(Qfil,trial,parname='params'):
 
 if __name__ == "__main__":
     import os
-    task='AIP'#'sequence'# 'Discrim' #'Bandit' #
+    task='Bandit' #'Discrim' # 'AIP'#'sequence'#
     if task=='sequence':
         from sequenceFiles import fil,param_name        
         figs={q:{} for q in fil.keys()}
@@ -608,7 +608,10 @@ if __name__ == "__main__":
                         if len(all_beta):
                             bkey=list(all_beta.keys())[keynum]
                             beta=copy.deepcopy(all_beta[bkey])
-                            figs[nQ]['qhx'+state]=combined_discrim_Qhx(Qhx_subset,bounds_subset,events_per_trial,phases,ideals_subset,all_beta=beta)#,Qlen=all_lenQ[bkey])
+                            if task=='AIP':
+                                figs[nQ]['qhx'+state]=combined_discrim_Qhx(Qhx_subset,bounds_subset,events_per_trial,phases,ideals_subset,all_beta=beta)
+                            else:
+                                figs[nQ]['qhx'+state]=combined_discrim_Qhx(Qhx_subset,bounds_subset,events_per_trial,phases,ideals_subset,all_beta=beta,Qlen=all_lenQ[bkey])
                             print('figures for',state,f,',bkey =',bkey)
                         else:
                             figs[nQ]['qhx']=plot_Qhx_2D(Qhx_subset,bounds_subset,events_per_trial,phases,ideals_subset,title=state)
