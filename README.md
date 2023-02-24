@@ -1,8 +1,8 @@
 ====
 TD2Q
 ====
-Python code for new reinforcement learning model
-Q learning model with Q matrices representing dSPN and iSPN
+Python3 code for new reinforcement learning model, called TD2Q
+Q learning model with Q matrices representing dSPN and iSPN, state-splitting, and adaptive exploration-exploitation parameter
 
 **A. Several reinforcement learning tasks have been implemented**
 - Discrim2stateProbT_twoQtwoS.py:
@@ -57,7 +57,7 @@ Q learning model with Q matrices representing dSPN and iSPN
   some additional functions used for graphs and accumulate output data
 	
 - Qlearn_multifile_param_anal.py
-	To analyze a large set of parameter sweep simulations
+	To analyze a large set of parameter sweep simulations that were run on the Mason cluster
 
 - TD2Q_manuscript_graphs.py and TD2Q_Qhx_graphs.py
 	* Used to create publication quality figures (or panels to combine into figures using photoshop).
@@ -66,6 +66,10 @@ Q learning model with Q matrices representing dSPN and iSPN
 - persever.py
 	* count how many times agent only makes 1 response, L or R, in probabilistic serial reversal, on the 50:50 block
 	* Also analyze how many times the prior block had best response the same as perseverant response
+
+- multisim_Discrim.py, multisim_Sequence.py, mutlisim_Bandit.py
+	* used to run parameter sweeps of beta and gamma of three tasks.  
+	* summary results saved in .npy files
 
 **C. Parameters**
 - params['numQ']=1 #number of Q matrices.  numQ=2 is improves the 2-arm bandit task and sequence task.  No effect on discirmination/extinction
