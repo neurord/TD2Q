@@ -7,7 +7,7 @@ Created on Wed Aug 19 12:12:28 2020
 
 ############ reward   ################
 rwd={'error':-5,'reward':10,'base':-1,'none':0} 
-
+#rwd={'error':-1,'reward':6,'base':0,'none':0,'partial':1}  #use these for Opal and Bogacz?
 ######### Parameters for the agent ##################################
 params={}
 params['wt_learning']=False
@@ -30,7 +30,7 @@ params['Q2other']=0.1
 params['forgetting']=0
 params['reward_cues']=None ##options: 'TSR', 'RewHx3', 'reward', None
 params['distance']='Euclidean'
-params['split']=True
+params['initQ']=-1 #split states, initialize Q values to best matching
 params['events_per_trial']=3
 
 ############### Make sure you have all the state transitions needed ##########

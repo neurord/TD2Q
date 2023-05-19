@@ -7,7 +7,8 @@ Created on 2022 Dec 5
 
 ############ reward   ################
 from BanditTaskParam import params,rwd,validate_T,validate_R
-rwd['reward']=rwd['reward']+2*rwd['base']
+
+rwd['reward']=(rwd['reward']+2*rwd['base']+2*rwd['partial'])  #for equivalence to 3 step task?
 act={'left':0,'right':1} 
 states={'loc':{'Pport':1},
         'tone':{'6kHz':6}} 
