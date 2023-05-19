@@ -7,22 +7,24 @@ Created on Wed Aug 19 12:26:59 2020
 
 import numpy as np
 from RL_class import Environment
+import copy
+
 ############ In fact, this can be used with any task where states are tuples
 class completeT(Environment): 
     """Specific Environment:
         """    
     def __init__(self, states,actions,R,T,params,printR=False):
         self.state_types={v:k for v,k in enumerate(states.keys())}
-        self.states=states
+        self.states=copy.copy(states)
         self.num_states={st:len(v) for st,v in states.items()}
         self.Ns=len(T)
         print('   ## env init, num states:',self.Ns, 'states types:',self.state_types,'\n   states',self.states,self.num_states)
-        self.actions=actions
+        self.actions=copy.copy(actions)
         self.Na = len(self.actions)
         super().__init__(self.Ns,self.Na)        
-        self.R=R #reward matrix
-        self.T=T #transition matrix
-        self.start_state=params['start']
+        self.R=copy.deepcopy(R) #reward matrix
+        self.T=copy.deepcopy(T) #transition matrix
+        self.start_state=copy.copy(params['start'])
         if printR:
             reward_thresh_for_printing=0
             print('########## R ############')
@@ -51,23 +53,22 @@ class completeT(Environment):
         if np.sum(weights)!=1.0:
             print('Reward probs do not sum to 1',self.state,self.state_from_number(self.state),action,self.action_from_number(action))
         choice = np.random.choice(num_choices,p=weights) #probabalistic reward 
-        self.reward=self.R[self.state][action][choice][0]
+        self.reward=self.R[self.state][action][choice][0] #0 contains reward
         if prn_info and np.abs(self.reward)>2:
             print('******* env reward', self.reward,'state,action',self.state,action)
         #Determine new state from taking action in state
-        num_choices=len(self.T[self.state][action])
-        #print('***********env',self.state,action,num_choices)
-        Tweights=[p[1] for p in self.T[self.state][action]]
-        #if len(Tweights)>1:
-        #    print('W',weights,'TW',Tweights, 'choice',choice,'state',self.state,'ACTION',action,'\nR',self.R[self.state][action],self.T[self.state][action])
-        if np.sum(Tweights)!=1.0:
-            print('transition probs do not sum to 1',self.state,self.state_from_number(self.state),action,self.action_from_number(action))
-        if Tweights!=weights:
-            choice=np.random.choice(num_choices,p=Tweights) #transition selection is separate from reward selection
-        #else:
-        #   use the same choice as for reward, since the transitions and rewards are linked
-        #if self.reward>9:
-        #    print ('prior state',self.state, 'new state',self.T[self.state][action][choice][0])
+        if len(self.T[self.state][action])!=len(self.R[self.state][action]):
+            num_choices=len(self.T[self.state][action])
+            #print('***********env',self.state,action,num_choices)
+            Tweights=[p[1] for p in self.T[self.state][action]]
+            #if len(Tweights)>1:
+            #    print('W',weights,'TW',Tweights, 'choice',choice,'state',self.state,'ACTION',action,'\nR',self.R[self.state][action],self.T[self.state][action])
+            if np.sum(Tweights)!=1.0:
+                print('transition probs do not sum to 1',self.state,self.state_from_number(self.state),action,self.action_from_number(action))
+            if Tweights!=weights:
+                choice=np.random.choice(num_choices,p=Tweights) #transition selection is separate from reward selection
+            #if self.reward>9:
+            #    print ('prior state',self.state, 'new state',self.T[self.state][action][choice][0])
         self.state=self.T[self.state][action][choice][0]
         return self.reward, self.state
     
