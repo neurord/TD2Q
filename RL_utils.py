@@ -43,7 +43,7 @@ def plot_trajectory(output_data,title,figure_sets):
                     else:
                         ylabel=ta[0][0]+' '+ta[1]
                     axis[ax].set_ylabel(ylabel)
-                    axis[ax].set_ylim([0,np.ceil(ymax)*1.05])
+                    axis[ax].set_ylim([0,np.ceil(ymax)*1.05]) 
                     #if phs == 'discrim' or phs == 'reverse':
                     #    axis[ax].set_ylim([0,10])
                     #else:
@@ -89,6 +89,8 @@ def run_sims(RL,phase,events,n_subset,action_items,noise,info,cues,rr,summary,ph
     #summary,t2=RL.count_actions(summary,action_items,trial_subset)
     summary,t2=RL.count_state_action(summary,action_items,n_subset)
     Q={'Q':RL.agent.Q,'ideal_states':RL.agent.ideal_states,'learn_weight':RL.agent.learn_weight,'rwd_prob':rwd_prob,'name':phase}
+    if hasattr(RL.agent,'V'):
+        Q['V']=RL.agent.V
     if rr==0:
         if np.max(RL.results['reward'])>0:
             t2=',mean reward='+str(np.round(np.mean(RL.results['reward'][-n_subset:]),2))

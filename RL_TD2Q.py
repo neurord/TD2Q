@@ -89,6 +89,8 @@ class RL:
             for ii in range(len(self.agent.Q)): #Q matrix
                 self.agent.visual(self.agent.Q[ii],labels=self.state_to_words(ii,noise),
                              title=learn_phase+' Q'+str(ii))
+            if hasattr(self.agent,'V'):
+                self.agent.plot_V(labels=self.state_to_words(0,noise),title=learn_phase+' V')
             if hist>1:
                 self.agent.plot_learn_history(title=learn_phase+', numQ='+str(ii+1)) 
     
