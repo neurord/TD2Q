@@ -26,9 +26,9 @@ class QL(Agent):
     """Class for a Q-learning agent"""
     
     def __init__(self, actions, params, oldQ={}):
-        self.numQ=params['numQ'] #Q matrix for D1 and D2
+        self.numQ=copy.copy(params['numQ']) #Q matrix for D1 and D2
         naction=len(actions)
-        self.actions=actions
+        self.actions=copy.copy(actions)
         #self.n_cues=len(cues)
         #each ideal_state = env state and zeros for other cues, 
         if len(oldQ):
@@ -67,37 +67,18 @@ class QL(Agent):
         self.min_learn_weight=0.1
         self.events_per_trial=copy.copy(params['events_per_trial'])
         self.distance=params['distance']
-        if 'use_OpAL' in params.keys():
-            self.use_OpAL = params['use_OpAL']
-            self.initQ=1
-        else:
-            self.use_OpAL=False 
-            self.initQ=0
-        if 'Q2other' in params.keys():
-            self.wt_Q2other=copy.copy(params['Q2other'])
-        else:
-            self.wt_Q2other=1
-        if 'decision_rule' in params.keys():
-            self.decision_rule=copy.copy(params['decision_rule'])
-        else:
-            self.decision_rule=None
-        if 'split' in params.keys():
-            self.split=copy.copy(params['split'])
-        else:
-            self.split=True
-        if 'forgetting' in params.keys():
-            self.forgetting=copy.copy(params['forgetting'])
-        else:
-            self.forgetting=0
-        if 'reward_cues' in params.keys():
-            self.reward_cues=copy.copy(params['reward_cues'])
-        else:
-            self.rewared_cues=None
+        optional_params={'use_Opal':False,'Q2other':0,'decision_rule':None,'forgetting':0,'reward_cues': None,'D2_rule':None,'initQ':0,}
+        for par,val in optional_params.items():
+            if par in params.keys():
+                setattr(self,par,copy.copy(params[par]))
+            else:
+                setattr(self,par,val)
         if 'state_units' in params:
             self.state_units=[x for x in params['state_units'].values()]
         self.winner_count={k:0 for k in range(self.numQ)}
-        self.Da_factor=1 #2: increase Q0 effect (no inhibition of GPi) and decrease Q1 effect if D1-SPN inact
-
+        self.Da_factor=1 # range: 0 to 2 when using *(1-Da_factor). value of 2 when using /Da_factor: increase Q0 effect (no inhibition of GPi) and decrease Q1 effect if D1-SPN inact
+        # if Da_factor=2 and using /Da_factor, then G values *2 and N values / 2
+        # if Da_factor=1.5 and using *(2-Da_factor), then G values * 1.5 and N values * 0.5 - same reduction in N values
         #################### allocate Q table
         self.Q={}
         if len(oldQ):
@@ -107,9 +88,11 @@ class QL(Agent):
             #if 'learn_weight' in oldQ.keys():
             #    self.learn_weight=copy.copy(oldQ['learn_weight'])
             if 'rwd_prob' in oldQ.keys():
-                self.prior_rwd_prob=copy.copy(oldQ['rwd_prob'])                
+                self.prior_rwd_prob=copy.copy(oldQ['rwd_prob']) 
+            if 'V' in oldQ.keys():
+                self.V=copy.copy(oldQ['V'])               
         ############# initalize memory of prior "non-ideal" states, covariance matrix
-        self.history_length=params['hist_len'] #maximum number of items in state_history
+        self.history_length=copy.copy(params['hist_len']) #maximum number of items in state_history
         self.state_history={kk:{i:[] for i in range(self.Ns[kk])} for kk in range(self.numQ)}
         #### the following are unused in by the Euclidean distance agent
         self.cov={kk: {} for kk in range(self.numQ)}
@@ -136,10 +119,7 @@ class QL(Agent):
         #print('update_cov for Q',nn,',state',state_num,'cov',self.cov[nn][state_num])
         
     def extendQ(self,nn,numrows):
-        if self.initQ==0: 
-            self.Q[nn]=np.vstack((self.Q[nn],np.zeros((numrows,self.Na))))
-        else: ########### for OpAL
-            self.Q[nn]=np.vstack((self.Q[nn],np.ones((numrows,self.Na))))
+        self.Q[nn]=np.vstack((self.Q[nn],self.initQ*np.ones((numrows,self.Na)))) #self.initQ* does nothing if initQ is 1.
         #print('Q extended. new shape',np.shape(self.Q[nn]))
 
     def splitQ(self,nn,Qrow):
@@ -148,13 +128,13 @@ class QL(Agent):
         
     def update_Qhx(self):
         for k in self.Qhx.keys():
-            if np.shape(self.Qhx[k])[1]<np.shape(self.Q[k])[0]:
-                #first, extend rows of Qhx so it matches Q
-                dim0=np.shape(self.Qhx[k])[0]
-                dim1=np.shape(self.Qhx[k])[1]
-                dim2=np.shape(self.Qhx[k])[2]
+            if np.shape(self.Qhx[k])[1]<np.shape(self.Q[k])[0]: #does number of ideal states in Q match that of Qhx?
+                #if not, extend rows of Qhx so it matches Q
+                dim0=np.shape(self.Qhx[k])[0] #length of Qhx, i.e., number of events or trials
+                dim1=np.shape(self.Qhx[k])[1] #number of states
+                dim2=np.shape(self.Qhx[k])[2] #number of actions
                 delta=np.shape(self.Q[k])[0]-dim1
-                self.Qhx[k]=np.concatenate((self.Qhx[k],np.zeros((dim0,delta,dim2))),axis=1)                
+                self.Qhx[k]=np.concatenate((self.Qhx[k],max(0,self.initQ)*np.ones((dim0,delta,dim2))),axis=1)                
             self.Qhx[k]=np.vstack((self.Qhx[k],self.Q[k][None]))
 
     def start(self,state,cues=[],state_num=0):
@@ -175,11 +155,18 @@ class QL(Agent):
             for kk in range(self.numQ):
                 self.ideal_states[kk]={state_num:[si for si in state]+allcues }
                 self.Ns[kk]+=1
-            if self.initQ==0:
+            if self.initQ==0 or self.initQ==-1:
                 self.Q={kk:np.zeros((self.Ns[kk], self.Na)) for kk in range(self.numQ)}
-            else: ############# for OpAL 
-                self.Q={kk:np.ones((self.Ns[kk], self.Na)) for kk in range(self.numQ)}
-                self.V=np.ones(self.Ns[kk])
+            else: ############# for Opal 
+                self.Q={kk:self.initQ*np.ones((self.Ns[kk], self.Na)) for kk in range(self.numQ)}
+                self.V=np.ones(self.Ns[0])
+        if self.initQ==0 or self.initQ==-1:
+            delta=0 #initial reward of 0 minus initial Q value of 0
+        else: ############# for Opal 
+            if self.use_Opal:
+                delta=-1 #initial reward of 0 minus initial V of 1.0
+            else:
+                delta=-self.initQ #initial reward of 0 minus initial Q value of self.initQ
         #nstate_types is len of list used to represent states
         self.nstate_types=len(self.ideal_states[0][state_num]) 
         #initalize weighting on noise as 1, update according to range of states values
@@ -192,16 +179,17 @@ class QL(Agent):
             for kk in range(self.numQ): 
                 for i in range(self.Ns[kk]):
                     self.init_cov(i,kk)
-        hist_items=['LR','TSR','rwd_hist','rwd_prob','delta','beta']
-        self.learn_hist={k:[] for k in hist_items}
-        self.learn_hist['lenQ']={q:[] for q in range(self.numQ)}
+        hist_items={'learn_weight':1,'TSR':0,'rwd_hist':0,'rwd_prob':0,'beta':self.beta_min,'delta':delta}
         if self.prior_rwd_prob:
             self.beta=self.prior_rwd_prob*(self.beta_max-self.beta_min)+self.beta_min
+            hist_items['rwd_prob']=self.prior_rwd_prob
         else:
             self.beta=self.beta_min
-        self.time_since_reward=0
+        self.TSR=hist_items['TSR']
+        self.learn_hist={k:[val] for k,val in hist_items.items()}
         #initalize dictionary to hold history of Q values, stack to initialize 3D array
-        self.Qhx={k: np.vstack((self.Q[k][None],self.Q[k][None])) for k in self.Q.keys()} 
+        self.Qhx={k: self.Q[k][None] for k in self.Q.keys()} 
+        self.learn_hist['lenQ']={q:[len(self.Qhx[q])] for q in range(self.numQ)}
         #start by selecting state and action from Q[0]
         #Note, state is list - one state for each Q
         self.state=[self.ideal_states[kk][self.state_num[kk]] for kk in range(self.numQ)]
@@ -218,7 +206,7 @@ class QL(Agent):
         elif self.reward_cues=='reward':
             newcues=cues+[np.heaviside(reward,0)]
         elif self.reward_cues=='TSR':
-            newcues=cues+[self.time_since_reward] #specifying 'TSR' means use time_since_reward
+            newcues=cues+[self.TSR] #specifying 'TSR' means use time_since_reward
         else:
             print('agent, add_reward_cue: unknown reward type')
             exit()
@@ -304,12 +292,14 @@ class QL(Agent):
             #add row to Q matrix.  
             if prn_info:
                 print('>>>>> new state for Q',nn, 'num',newstate_num,'ideal',self.ideal_states[0])
-            if self.split==True: #add row to Q matrix.  
+            if self.initQ==-1: #add row to Q matrix.  
                 #Initialize it the same as best matching state
                 self.splitQ(nn,best_match)
             else:
-                #add row of zeros to Q matrix.  Ideally, add in parameter that determines whether to initialize to 0 or to existing state
+                #add row of constant values to Q matrix.  Ideally, add in parameter that determines whether to initialize to const or to existing state
                 self.extendQ(nn,1)
+                if self.use_Opal and nn==0:
+                    self.V=np.pad(self.V, (0, 1), 'constant')
             #update weights on the noise - according to range of state values (differences between adjacent values)
             for ii in range(self.nstate_types):
                 statevals=[np.round(idst[ii],1) for idst in self.ideal_states[nn].values()]
@@ -320,13 +310,16 @@ class QL(Agent):
             self.ideal_states[nn][newstate_num]=list(np.mean(self.state_history[nn][newstate_num],axis=0))
         newstate=[int(np.round(ns)) for ns in self.ideal_states[nn][newstate_num]]
         if prn_info:
-            print('###### END SELECT: Q',nn,'Acues,teststate, new state:',Acues,[round(ns,2) for ns in noisestate],newstate,', time since reward',self.time_since_reward)
+            print('###### END SELECT: Q',nn,'Acues,teststate, new state:',Acues,[round(ns,2) for ns in noisestate],newstate,', time since reward',self.TSR)
         return newstate,newstate_num
     
     def boltzmann(self, qval,beta): #q must be an array or list of actions that can be taken
         """Boltzmann selection"""
         pa = np.exp( beta*qval)   # unnormalized probability
         pa = pa/sum(pa)    # normalize
+        if np.any(np.isnan(pa)):
+            print('nan detected,', pa,' using qval without exp since >700', qval)
+            pa=qval/sum(qval)
         act=np.random.choice(len(qval), p=pa)
         actp=pa[act]
         return  act,actp#choose action randomly, with prob distr given by pa
@@ -334,9 +327,9 @@ class QL(Agent):
     def boltzman2Q(self,q1,q2,beta):
         #(soft) maximize over action: Q1(action) - Q2 (action)
         if self.decision_rule=='delta' :
-            deltaQ=q1-q2 #subtracting Q2 weights, as in Collins and Frank
+            deltaQ=q1*self.Da_factor-q2*(2-self.Da_factor) #subtracting Q2 weights, as in Collins and Frank
         elif self.decision_rule=='sumQ2':
-            deltaQ=q1-q2+np.sum(q2) #add Q2 val of all OTHER actions
+            deltaQ=q1*self.Da_factor-q2*(2-self.Da_factor)+np.sum(q2) #add Q2 val of all OTHER actions
         elif self.decision_rule=='combo':
             # Q1(action) - Q2 (action) + Q2[other actions)]
             deltaQ=q1-2*q2+np.sum(q2) 
@@ -352,26 +345,44 @@ class QL(Agent):
     def moving_average(self,x, w):
         return uniform_filter1d(x, w,origin=int(w/2)) #follows mean great, origin makes it causal
 
-    def OpAL(self,reward,last_state_num):
+    def Opal_delta(self,reward,last_state_num):
         #convert last_state_num into location, tone, context
         #initialize self.V to state types?  list of lists :1 for statetype in state states in statetype
         #delta=reward - (self.V[loctype,loc]+self.V[tonetype,tone]+self.V[contxttype,context])
         #self.V[statetype,state] += self.gamma*delta.  gamma can have different values for different state types
         delta=reward-self.V[last_state_num[0]]    #delta = reward - sum (self.V[bits])
-        self.V[self.state_num[0]] =self.V[self.state_num[0]] + self.gamma*delta #Value of nth bit updated by gamma * (reward - sum of Values)
-        self.Q[0][self.state_num[0],self.action]=self.Q[0][last_state_num[0],self.action](1+self.alpha[0]*delta)
-        self.Q[1][self.state_num[1],self.action]=self.Q[1][last_state_num[1],self.action](1-self.alpha[1]*delta)
+        self.V[last_state_num[0]] += self.gamma*delta #Value of nth bit updated by gamma * (reward - sum of Values)
+        return delta
+    def Opal_learn(self,delta,last_state_num,q):
+        self.Q[q][last_state_num[q],self.action]+=self.alpha[q]*delta*self.Q[q][last_state_num[q],self.action]
 
-    def D1_learn(self,reward,q,last_state_num,prn_info=False):      
-        delta = reward + self.gamma*max(self.Q[q][self.state_num[q],:]) - self.Q[q][last_state_num[q],self.action]
+    def vanSwieten_learn(self,delta,last_state_num,q):
+        #does not use self.gamma*max(self.Q[0][self.state_num[0],:]), so subtract that from passed in delta
+        #does use difference between G and N, so subtract Q[1] = N
+        newdelta = delta
+        #newdelta = delta - self.gamma*max(self.Q[0][self.state_num[0],:]) - self.Q[1][last_state_num[1],self.action]
+        eps=1
+        lambd=0.01
+        if newdelta>0 and q==0:
+            eps=0.8
+        if newdelta<0 and q==1:
+            eps=0.8
+        self.Q[q][last_state_num[q],self.action] += self.alpha[q]*eps*newdelta-lambd*self.Q[q][last_state_num[q],self.action]
+    
+    def D1_delta(self,reward,last_state_num,q=0):
         #if reward>0 or delta<5:
         #    print('delta',round(delta,2),'rwd',round(reward,2),'prob',self.rwd_prob,'act',self.action,'new_state',self.state_num[q],'gamma*max',self.Q[q][self.state_num[q]],'-this Q',self.Q[0][last_state_num[0],self.action])
+        delta = reward + (self.gamma*max(self.Q[q][self.state_num[q],:]) - self.Q[q][last_state_num[q],self.action])
+        return delta
+
+    def D1_learn(self,delta,last_state_num,q=0,prn_info=False):      
         if prn_info:
             print('>>>>>>>> before learn, Q:',q,'=',self.Q[q][last_state_num[q]],'act=',self.action)
         if self.wt_learning:
             self.Q[q][last_state_num[q],self.action] += self.learn_weight*self.alpha[q]*delta #if you take best action but no reward, decrease value
         else:
             #reward<= 0 means no Da, #rule for D2 Q matrix if decision_rule = 'none'
+            #lambda: small decay to maintain equilibrium
             self.Q[q][last_state_num[q],self.action] += self.alpha[q]*delta #if you take best action but no reward, decrease value
         if prn_info:
             print('>>>>>>>> after learn, Q:',q,'=',self.Q[q][last_state_num[q]],'delta',delta)
@@ -393,7 +404,7 @@ class QL(Agent):
         ### DIFFERENT RULE for Q2 ####
         #Invert the difference between current and prior Q
         if reward and self.Q2other==0:  #delta from Q2 matrix only works if Q2other is zero
-            delta = reward - (0.5*self.gamma*min(self.Q[q][self.state_num[q],:]) - self.Q[q][last_state_num[q],self.action]) 
+            delta = reward - (0.5*self.gamma*min(self.Q[q][self.state_num[q],:]) - self.Q[q][last_state_num[q],self.action])  #0.5 means use half the gamma for D2 delta
         '''
         #  possibly use reward**(1/3) to compresses the range,
         #  compress the RPE instead of the reward?
@@ -410,15 +421,15 @@ class QL(Agent):
         if delta>0 or (delta<0 and not block_DA): #possibly change to if not block_DA
             self.Q[q][last_state_num[q],self.action] -= alpha*delta #if you take best action but no reward, decrease value (I.e., use -delta as in Collins and Frank)
 		#. change values for actions not taken - i.e., increase value of other actions
-        #  If wt_Q2other=0, then this part does not happen
+        #  If Q2other=0, then this part does not happen
         #if (block_DA=='no_dip' and delta>0) or (block_DA=='AIP' and delta<0) or block_DA==False: #both types of heterosynaptic depression
         if delta<0 and block_DA != 'no_dip': # heterosynaptic depression only.  Justified by 2ag diffusion
             for act in self.actions.values(): 
                 if act != self.action:
-                    self.Q[q][last_state_num[q],act]+= self.wt_Q2other*alpha*delta
+                    self.Q[q][last_state_num[q],act]+= self.Q2other*alpha*delta
                 #self.Q[q][last_state_num[q],act]= (1-self.forgetting*self.alpha[q])*self.Q[q][last_state_num[q],act]
         #if delta< 0 - as in low dopamine condition of Gurney, then LTP occurs for 'other' actions
-        ## alternative - to maintain sumQ constant, make self.wt_Q2other = self.alpha/num_actions
+        ## alternative - to maintain sumQ constant, make self.Q2other = self.alpha/num_actions
 		## ther actions represent state input to neuron with no action input - reduced (weaker) Ctx inputs.
 		##       Consider LTD regardless of Da dip (delta)    
         return
@@ -430,26 +441,35 @@ class QL(Agent):
         RTmax=8 #Collins 10
         self.RT.append(RT0+RTmax/(1+np.exp(winning_prob-theta)))
 
-    def choose_act(self,D1rule=False,prn_info=False):
+    def choose_act(self,prn_info=False):
         self.action,act0prob = self.boltzmann( self.Q[0][self.state_num[0],:],self.beta)
         winner='Q0'
         self.winner_count[0]+=1
         winning_prob=act0prob
         if self.numQ>1:
-            if D1rule: #never used?
+            if self.D2_rule=='Opal' or self.D2_rule=='Bogacz': #i.e., if Opal or Bogacz, don't invert Q values
                 self.action2,act1prob = self.boltzmann( self.Q[1][self.state_num[1],:],self.beta)
             else:
                 self.action2,act1prob = self.boltzmann( -self.Q[1][self.state_num[1],:],self.beta)               
             if self.action != self.action2:
+                if self.Da_factor>2:
+                    import sys
+                    sys.exit('Da_factor outside allowed range of [0,2]')
+                else:
+                    b=2-self.Da_factor #additive
+                    #b=1/self.Da_factor #multiplicative,  old Da_factor         
                 if prn_info:
                     print('$$$$$$$ step, Q0 action,prob', self.action,round(act0prob,5), 'Q1 action,prob',self.action2,round(act1prob,5))
                     if self.Da_factor!=1:
-                        print('act0,act1prob',act0prob,act1prob,'Da biased',act0prob*self.Da_factor,act1prob/self.Da_factor)
+                        print('act0,act1prob',act0prob,act1prob,'Da biased',act0prob*self.Da_factor,act1prob*b)
                 if self.beta_GPi>100: #arbitrary number indicating do use the max (old rule)
-                    action_set_index=np.argmax([act0prob*self.Da_factor,act1prob/self.Da_factor]) #max rule
+                    action_set_index=np.argmax([act0prob*self.Da_factor,act1prob*b]) #max rule
                     winning_prob=[act0prob,act1prob][action_set_index]
                 else:
-                    action_set_index,winning_prob=self.boltzmann(np.array([act0prob*self.Da_factor,act1prob/self.Da_factor]), self.beta_GPi)       
+                    #Alternative.  make self.Da_factor between 0 and 2 (default=1), multiply by Da_factor and 2-Da_factor
+                    #That is similar to factors of a and b in OpAL
+                    #self.rwd_prob*(self.beta_GPi-self.beta_min)+self.beta_min
+                    action_set_index,winning_prob=self.boltzmann(np.array([act0prob*self.Da_factor,act1prob*b]), self.beta_GPi)
                 #if act1prob>act0prob: #rule used in 1st draft of TD2Q manuscript
                 if action_set_index==1:	
                     #print('$$$$$$$ step, Q1 action', self.action,round(act0prob,5), 'Q2 action',self.action2,round(act1prob,5))
@@ -467,13 +487,13 @@ class QL(Agent):
         last_state=self.state
         last_state_num=self.state_num
         if reward>0: #track time since reward - use as cue or learning rate
-            self.time_since_reward=0
+            self.TSR=0
         else:
-            self.time_since_reward+=self.time_increment
+            self.TSR+=self.time_increment
         #vector of reward history - used to estimate reward probability
         self.learn_hist['rwd_hist'].append(np.heaviside(reward,0))
         #vector of time since reward
-        self.learn_hist['TSR'].append(self.time_since_reward)
+        self.learn_hist['TSR'].append(self.TSR)
         if len(self.learn_hist['rwd_prob'])>self.window: #test moving average if enough samples and agent has finally received a reward
             #learning rate depends on difference between prior reward prob and current reward prob
             #learning rate should not be lower than arbitrary minimum, no higher than 1.0
@@ -487,7 +507,7 @@ class QL(Agent):
         else:
             self.rwd_prob=0   
             #do not change self.beta
-        self.learn_hist['LR'].append(self.learn_weight)
+        self.learn_hist['learn_weight'].append(self.learn_weight)
         self.learn_hist['rwd_prob'].append(self.rwd_prob)
         self.learn_hist['beta'].append(self.beta)
         for q in range(self.numQ):
@@ -510,16 +530,30 @@ class QL(Agent):
         self.state_num=newstate_num
         #
         ############################# based on reward, update Q matrix ###############################
-        if self.use_OpAL:
-            self.OpAL(self,reward,last_state_num)
+        if self.use_Opal:
+            delta=self.Opal_delta(reward,last_state_num)
+            self.Opal_learn(delta,last_state_num,0)
+            self.Opal_learn(-delta,last_state_num,1)
         else:
-            delta=self.D1_learn(reward,0,last_state_num,prn_info=False) #0 means update Q[0]
-            self.learn_hist['delta'].append(delta)
+            delta=self.D1_delta(reward,last_state_num)
+            if self.D2_rule=='Opal': #apply Opal rule to both D1 and D2
+                self.Opal_learn(delta,last_state_num,0) #apply Opal to D1
+            elif self.D2_rule=='Bogacz':
+                self.vanSwieten_learn(delta,last_state_num,0)
+            else:
+                self.D1_learn(delta,last_state_num,q=0,prn_info=False) #q=0 means update Q[0]
             if self.numQ>1:
-                #self.D1_learn(reward,1,last_state_num,prn_info=False) #use same learning rule for Q0 and Q1 (D2 and D1)
-                #delta is the RPE = Da signal.  Cannot estimate it from Q2
+                #delta is the RPE = Da signal.  Cannot estimate it from Q2 if Q2_other>0
                 #if block_DA: delta=0
-                self.D2_learn(delta,1,last_state_num,prn_info=False,block_DA=block_DA) #1 means update Q[1] # use reward=reward and Q2other=0 to have different gamma for Q2
+                if self.D2_rule=='Ndelta':
+                    self.D2_learn(delta,1,last_state_num,prn_info=False,block_DA=block_DA,reward=reward) #will use N matrix to estimate delta
+                elif self.D2_rule=='Opal':
+                    self.Opal_learn(-delta,last_state_num,1) #apply Opal with negative delta to D2
+                elif self.D2_rule=='Bogacz':
+                    self.vanSwieten_learn(delta,last_state_num,1)
+                else: #default=None, use delta from D2_learn
+                    self.D2_learn(delta,1,last_state_num,prn_info=False,block_DA=block_DA) #1 means update Q[1] # use reward=reward and Q2other=0 to have different gamma for Q2
+        self.learn_hist['delta'].append(delta)
         self.update_Qhx()
         ####################### given the state, what is the best action?
         winner=self.choose_act() #use this rule if Q2 updated using D1_learn, or numQ==1
@@ -543,7 +577,7 @@ class QL(Agent):
         color_increment=int((len(colors.colors)-40)/(len(self.actions)-1)) #40 to avoid to light colors
         newQ=[];statenums=[];xlabels=[]
         for s,row in enumerate(Q):
-            if np.any(row):
+            if np.any(row) and np.std(row)>0:
                 newQ.append(row)
                 statenums.append(s)
                 if labels is not None:
@@ -571,9 +605,28 @@ class QL(Agent):
                 plt.vlines(ll+0.5,np.min(plotQ),np.max(plotQ),'grey',linestyles='dashed')
             if labels is not None:
                 for ii,l in enumerate(xlabels):
-                    plt.annotate(' '.join(l), (ii-0.5, np.min(plotQ)-0.05*(ii%2)*(np.max(plotQ)-np.min(plotQ))))
+                    plt.annotate(' '.join(l), (ii-0.5, np.min(plotQ)-min(-0.25,0.05*(ii%2)*(np.max(plotQ)-np.min(plotQ)))))
             plt.show()
     
+    def plot_V(self,title='',labels=None):
+        import matplotlib.pyplot as plt
+        plt.ion()
+        plt.figure()
+        plt.suptitle(title)
+        statenums=[];xlabels=[];newV=[]
+        for s,val in enumerate(self.V):
+            if val!=0:
+                newV.append(val)
+                statenums.append(s)
+                if labels is not None:
+                    xlabels.append(' '.join(labels[s]))
+        plt.bar(np.arange(len(statenums)),newV)
+        plt.xticks(range(len(newV)),statenums)
+        plt.xlabel("state"); plt.ylabel("V")
+        if labels is not None:
+            plt.xticks(range(len(newV)),xlabels)
+        plt.show()
+
     def plot_learn_history(self,title=''):
         import matplotlib.pyplot as plt
         plt.ion()
