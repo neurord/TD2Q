@@ -456,8 +456,8 @@ class QL(Agent):
                     import sys
                     sys.exit('Da_factor outside allowed range of [0,2]')
                 else:
-                    b=2-self.Da_factor #additive
-                    #b=1/self.Da_factor #multiplicative,  old Da_factor         
+                    b=2-self.Da_factor #additive Da factor, similar to factors of a and b in OpAL. Value must be between 0 and 2
+                    b=1/self.Da_factor #multiplicative , used for TD2Q manuscript      
                 if prn_info:
                     print('$$$$$$$ step, Q0 action,prob', self.action,round(act0prob,5), 'Q1 action,prob',self.action2,round(act1prob,5))
                     if self.Da_factor!=1:
@@ -466,8 +466,6 @@ class QL(Agent):
                     action_set_index=np.argmax([act0prob*self.Da_factor,act1prob*b]) #max rule
                     winning_prob=[act0prob,act1prob][action_set_index]
                 else:
-                    #Alternative.  make self.Da_factor between 0 and 2 (default=1), multiply by Da_factor and 2-Da_factor
-                    #That is similar to factors of a and b in OpAL
                     #self.rwd_prob*(self.beta_GPi-self.beta_min)+self.beta_min
                     action_set_index,winning_prob=self.boltzmann(np.array([act0prob*self.Da_factor,act1prob*b]), self.beta_GPi)
                 #if act1prob>act0prob: #rule used in 1st draft of TD2Q manuscript
