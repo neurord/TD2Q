@@ -1,4 +1,4 @@
-submission=2
+submission=3
 actions=['rwd',(('Llever', '**LL'), 'goR'), (('Rlever', '*LLR'), 'press')]
 action_text=['reward', '**LL, go Right','*LLR press R']
 if submission==1:
@@ -39,11 +39,12 @@ if submission==1:
     fil={'1':'Sequence2021-12-16_HxLen4_numQ1_alpha0.2_0_st0.75_0_q2o0.1beta0.9splitTrue','2':'Sequence2021-12-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue'}
     fil={'1':'Sequence2022-08-10_HxLen4_numQ1_alpha0.2_0_st0.75_0_q2o0.1beta0.9splitTrue','2':'Sequence2022-08-16_HxLen4_numQ2_alpha0.2_0.35_st0.75_0.625_q2o0.1beta0.9splitTrue'}
     
-elif submission==2:
-    subdir0='NormEuclidPLoSsubmission2_Q2other0/' #q2other=0.0
+elif submission>=2:
+    subdir0='ManuscriptFiles/'#'NormEuclidPLoSsubmission2_Q2other0/' #q2other=0.0
     param_name='par'
     test='numQ' #'inact'#'gamma'#'beta' #'Q2other'#
-    testsplit=True
+    testsplit=False
+    testrule=False
     test_variables=['rwd__End']
     fil={'1':subdir0+'Sequence2023-01-17numQ1_Q2other0.0_beta_GPi10_decision_ruleNone_beta_min0.5_beta3_gamma0.95_rwd15_splitTrue', 
         '2':subdir0+'Sequence2023-01-17numQ2_Q2other0.0_beta_GPi10_decision_ruleNone_beta_min0.5_beta3_gamma0.95_rwd15_splitTrue'}
@@ -84,8 +85,12 @@ elif submission==2:
                         subdir0+'Sequence2023-01-11numQ1_Q2other0.0_beta_GPi10_decision_ruleNone_beta_min0.5_beta3_gamma0.95_rwd15_splitFalse.npz']
                 pattern=subdir0+'Sequence2023-01-17numQ*_Q2other0.0_beta_GPi10_decision_ruleNone_beta_min0.5_beta3_gamma0.95_rwd15_splitTrue.npz'
                 if testsplit:
-                        files=files+splitfalse
-                        dep_var=dep_var+['split']
+                      files=files+splitfalse
+                      dep_var=dep_var+['split']
+                elif testrule:
+                      files=files+['Sequence2023-05-01numQ2_Q2other0.0_beta_GPi10_decision_ruleNone_beta_min0.5_beta3_gamma0.95_rwd15_initQ-1.npz']
+                      dep_var=dep_var+['D2_rule']
+                      keys=['numQ1','numQ2','Ndelta']
         elif test=='gamma':        #test gamma
                 pattern=subdir0+'Sequence2023-01-10numQ2_Q2other0.0_decision_ruleNone_beta3_beta_min0.5_gamma*_beta_GPi10_rwd15_splitTrue*'
         elif test=='beta':        #test beta

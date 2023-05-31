@@ -1,4 +1,4 @@
-submission=2
+submission=3
 zero_responses=['extinc_Pport_10kHz_left_Beg','extinc_Pport_10kHz_left_End', 'extinc_Pport_10kHz_right_Beg', 'extinc_Pport_10kHz_right_End',
                 'renew_Pport_10kHz_left_Beg', 'renew_Pport_10kHz_left_End', 'renew_Pport_10kHz_right_Beg', 'renew_Pport_10kHz_right_End',
                 'acquire_Pport_10kHz_left_Beg', 'acquire_Pport_10kHz_left_End', 'acquire_Pport_10kHz_right_Beg', 'acquire_Pport_10kHz_right_End']
@@ -39,9 +39,10 @@ if submission==1:
     fil={#'1':'Discrim2022-06-14_numQ1_alpha0.3_0_st1.0_0_q2o0.1_beta0.5_splitTrue',
              '2':'Discrim2022-06-14_numQ2_alpha0.2_0.1_st0.75_0.625_q2o0.1_beta0.5_splitTrue' }
 
-elif submission==2:
+elif submission>=2:
     subdir0='NormEuclidPLoSsubmission2_Q2other0/' #q2other=0.0
-    test='numQ'# 'beta'#'AIP' #'split'#'gamma' #'beta_min',  'decision_rule' 
+    subdir0='ManuscriptFiles/'
+    test='AIP' #'numQ'#'split'# 'alpha'#'gamma' #'beta'# 'beta_min',  'decision_rule' 
     test_variables=['rwd__End']
     dep_var=[test]
     keys=None
@@ -52,11 +53,18 @@ elif submission==2:
         files=[subdir0+'Discrim2022-12-19_numQ1_alpha0.3_0_st1.0_0_q2o0.1_gamma0.82_bmin0.5_bmax1.5_splitTrue_ruleNone.npz',
             subdir0+'Discrim2023-01-10numQ2_Q2other0.0_beta_GPi10_decision_ruleNone_beta_min0.5_beta1.5_gamma0.82_splitTrue.npz']
         fil={'2':subdir0+'Discrim2023-01-10numQ2_Q2other0.0_beta_GPi10_decision_ruleNone_beta_min0.5_beta1.5_gamma0.82_splitTrue',
-            '1':subdir0+'Discrim2022-12-19_numQ1_alpha0.3_0_st1.0_0_q2o0.1_gamma0.82_bmin0.5_bmax1.5_splitTrue_ruleNone'}
+            '1':subdir0+'Discrim2022-12-19_numQ1_alpha0.3_0_st1.0_0_q2o0.1_gamma0.82_bmin0.5_bmax1.5_splitTrue_ruleNone'} #Qhx file has been lost
     if test=='split':
-        keys=['no split','split']
+        keys=['initQ=0','split', 'initQ=1']
         files=[subdir0+'Discrim2023-01-10_numQ2_alpha0.2_0.1_st0.75_0.625_q2o0.0_gamma0.82_bmin0.5_bmax1.5_splitFalse_ruleNone.npz',
-               subdir0+'Discrim2023-01-10numQ2_Q2other0.0_beta_GPi10_decision_ruleNone_beta_min0.5_beta1.5_gamma0.82_splitTrue.npz']
+               subdir0+'Discrim2023-01-10numQ2_Q2other0.0_beta_GPi10_decision_ruleNone_beta_min0.5_beta1.5_gamma0.82_splitTrue.npz',
+               subdir0+'Discrim2023-04-27_numQ2_alpha0.2_0.1_st0.75_0.625_q2o0.0_gamma0.82_bmin0.5_bmax1.5_split1_ruleNone.npz']
+    if test=='alpha':
+        import glob
+        newfiles=glob.glob(subdir0+'Discrim2023-04-21_numQ2_alpha0.2_*_st0.75_0.625_q2o0.0_gamma0.82_bmin0.5_bmax1.5_split-1_ruleNone.npz')
+        files=[]
+        for f in newfiles:
+            files.append(f)
     if test=='AIP':
         #actions=['rwd',(('Pport', '6kHz'),'left'),(('Pport', '10kHz'),'right'), (('Pport', '10kHz'),'left')]
         #action_text=['reward','6 kHz Left', '10 kHz Right', '10 kHz Left']
