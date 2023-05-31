@@ -133,17 +133,18 @@ def calc_fraction_left(traject_dict,runs):
         ratio[k]=L/(L+R)
     return fractionLeft,noL,noR,ratio
 
-def combined_bandit_Qhx_response(random_order,num_blocks,traject_dict,Qhx,boundaries,ept,phases):
+def combined_bandit_Qhx_response(random_order,num_blocks,traject_dict,Qhx,boundaries,params,phases):
     from matplotlib.gridspec import GridSpec
     import matplotlib.pyplot as plt
     from TD2Q_Qhx_graphs import agent_response,plot_Qhx_2D
-    
+    ept=params['events_per_trial']
+    trials_per_block=params['trials_per_bock']
     fig=plt.figure()
     gs=GridSpec(2,2) # 2 rows, 2 columns
     ax1=fig.add_subplot(gs[0,:]) # First row, span all columns
     ax2=fig.add_subplot(gs[1,0]) # 2nd row, 1st column
     ax3=fig.add_subplot(gs[1,1]) # 2nd row, 2nd column
-    agent_response([-1],random_order,num_blocks,traject_dict,fig,ax1)
+    agent_response([-1],random_order,num_blocks,traject_dict,trials_per_block,fig,ax1)
     fig=plot_Qhx_2D(Qhx,boundaries,ept,phases,fig=fig,ax=[ax2,ax3])  
     
     #add subplot labels 
@@ -226,7 +227,7 @@ if __name__ == '__main__':
     trial_subset=int(0.1*numevents) #display mean reward and count actions over 1st and last of these number of trials 
     #update some parameters of the agent
     params['Q2other']=0.0
-    params['numQ']=1
+    params['numQ']=2
     params['wt_learning']=False
     params['distance']='Euclidean'
     params['beta_min']=0.5 #increased exploration when rewards are low
@@ -235,7 +236,7 @@ if __name__ == '__main__':
     params['gamma']=0.82
     params['moving_avg_window']=3  #This in units of trials, the actual window is this times the number of events per trial
     params['decision_rule']= None #'delta' #'mult' #
-    params['initQ']=-1 #-1 means do state splitting. If initQ=0, 1 or 10, it means initialize Q to that value and don't split
+    params['initQ']=-1#-1 means do state splitting. If initQ=0, 1 or 10, it means initialize Q to that value and don't split
     params['D2_rule']= None #'Ndelta' #'Bogacz' #'Opal'#'Bogacz' ### Opal: use Opal update without critic, Ndelta: calculate delta for N matrix from N values
     params['step1']=step1
     use_oldQ=True
@@ -430,10 +431,16 @@ if __name__ == '__main__':
     if '50:50' in prob_sets.keys():
         print('perseverance',', no L',noL['50:50'],', no R',noR['50:50'],'fraction',(noL['50:50']+noR['50:50'])/runs)
 
+    ag_dict={}
+    for ag in agents:
+        ag_dict[ag.name]= {'Q':ag.agent.Q, 'ideal_states':ag.agent.ideal_states,'states':states,'actions':act}    
+        if hasattr(ag.agent,'V'):
+            ag_dict[ag.name]['V']=ag.agent.V
+    np.save('Q_V_'+fname,ag)    
     if plot_Qhx:
         from TD2Q_Qhx_graphs import agent_response
         display_runs=range(min(3,runs))
-        figs=agent_response(display_runs,random_order,num_blocks,traject_dict,norm=1/trials_per_block)
+        figs=agent_response(display_runs,random_order,num_blocks,traject_dict,trials_per_block,norm=1/trials_per_block)
         phases=list(acq.keys())
         if save_data:
             if runs>50: #only save mean_Qhx to reduce file size
@@ -441,8 +448,7 @@ if __name__ == '__main__':
                 all_bounds=[all_bounds[0]] #all are the same, no need to save all of them
                 ideals=[all_ideals[0]] #not all the same, but not used in Qhx graph
             np.savez('Qhx'+fname,all_Qhx=all_Qhx,all_bounds=all_bounds,params=params,phases=phases,
-            all_ideals=all_ideals,random_order=random_order,num_blocks=num_blocks,all_beta=all_beta,all_lenQ=all_lenQ,all_RT=all_RT)
-                
+                all_ideals=all_ideals,random_order=random_order,num_blocks=num_blocks,all_beta=all_beta,all_lenQ=all_lenQ,all_RT=all_RT)
     if plot_Qhx==2:
         from TD2Q_Qhx_graphs import plot_Qhx_2D 
         #plot Qhx and agent response       
@@ -453,7 +459,7 @@ if __name__ == '__main__':
             
         ########## combined figure ##############   
         if len(Qhx[0].keys())==1:
-            fig=combined_bandit_Qhx_response(random_order,num_blocks,traject_dict,Qhx,boundaries,params['events_per_trial'],phases)
+            fig=combined_bandit_Qhx_response(random_order,num_blocks,traject_dict,Qhx,boundaries,params,phases)
     elif plot_Qhx==3: 
         ### B. 3D plot Q history for selected actions, for all states, one graph per phase
         for rl in acq.values():
