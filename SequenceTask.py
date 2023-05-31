@@ -269,7 +269,8 @@ if __name__ == "__main__":
     params['gamma']=0.95
     params['beta_GPi']=10
     params['moving_avg_window']=3 
-    params['split']=True
+    params['initQ']=-1 #-1 means do state splitting.  If initQ=0, 1 or 10, it means initialize Q to that value and don't split
+    params['D2_rule']= None #'Ndelta' #'Bogacz' #'Opal'### Opal: use Opal update without critic, Ndelta: calculate delta for N matrix from N values
     params['rwd']=rwd['reward']
     #lower means more states
     state_thresh={'Q1':[0.75,0],'Q2':[0.75,0.875]} #without normalized ED, with heterosynaptic LTP 
@@ -358,7 +359,7 @@ if __name__ == "__main__":
             dt=datetime.datetime.today()
             date=str(dt).split()[0]
             key_params=['numQ','Q2other','beta_GPi','decision_rule','beta_min','beta','gamma','rwd']
-            fname_params=key_params+['split']
+            fname_params=key_params+['initQ']
             fname='Sequence'+date+'_'.join([k+str(params[k]) for k in fname_params])
             #fname='Sequence'+date+'_HxLen'+str(Hx_len)+'_alpha'+'_'.join([str(a) for a in params['alpha']])+'_st'+'_'.join([str(st) for st in params['state_thresh']])+\
 
