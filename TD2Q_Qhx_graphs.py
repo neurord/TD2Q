@@ -8,6 +8,7 @@ import numpy as np
 
 import matplotlib.pyplot as plt
 import copy
+import sys
 plt.ion()
 
 # possibly accumulate Qhx, as done in Sequence task - 
@@ -20,19 +21,66 @@ blank=0.03
 fsize=12
 fsizeSml=10 
 
+def Qhx_multiphaseNewQ(states,actions,agents,numQ):
+    #find the state number corresponding to states for each learning phase
+    #this does not work if each phase starts from New - not using oldQ
+    sorted_agents=sorted(agents, key=lambda x: float(x.name.split(':')[0])/float(x.name.split(':')[1]))
+    state_digits=1
+    ideal_states={q:{} for q in range(numQ)}
+    Qhx={q:{state:{ac:[[] for n in range(1)] for ac in actions} for state in states} for q in range(numQ)}
+    #boundary stores x values for drawing phase boundaries
+    boundary={q:{state:[0] for state in states} for q in range(numQ)}
+    for rl in sorted_agents: 
+        state_nums={q:{state:[] for state in states} for q in range(numQ)}
+        for q in range(numQ):
+            for state in states:
+                for stnum,st in rl.agent.ideal_states[q].items(): 
+                    ######## Note, [0] and [1] below implies each state has two components.  Need to generalize this
+                    if int(round(st[0]))==rl.env.states['loc'][state[0]] and int(round(st[1]))==rl.env.states['tone'][state[1]]:
+                        state_nums[q][state].append(stnum)
+                if len(state_nums[q][state])>1:
+                    sys.exit('Error, too many states {} for {} created for phase {}, Q {} starting from NEW '.format(state_nums[q][state],state,rl.name,q))
+                elif len(state_nums[q][state])==0:
+                    print(' @@@@@@@@@@@@@@@@@ state',state,'not found for Q=',q, 'agent',rl.name)
+                    state_nums[q][state]=[-1]
+                    ideal_states[q][state]=[np.nan,np.nan]
+                else:
+                    ideal_states[q][state]=[[str(round(a,state_digits)) for a in rl.agent.ideal_states[q][stnum]] for stnum in state_nums[q][state]]
+            #print('Q',q,'ideal_states',ideal_states[q],'state_nums',state_nums[q])
+            for state,stnums in state_nums[q].items():
+                boundary[q][state].append(boundary[q][state][-1]+len(rl.agent.Qhx[q])/rl.agent.events_per_trial)
+                for ac,arr in Qhx[q][state].items():
+                    for arr_num,stn in enumerate(stnums):
+                        #print('concat phase, Q',q,'state',state,stnums,'ac',ac,'arr_num',arr_num,'stn',stn)
+                        if stn==-1: #arr_num = 0, no other stn values
+                            print( ' @@@@@@ ready to add Q history for missing state',state,'for Q=',q, 'agent',rl.name,'1 state num:', stnums)
+                            if len(Qhx[q][state][ac][arr_num]):
+                                Qhx[q][state][ac][arr_num]=np.concatenate((Qhx[q][state][ac][arr_num],np.zeros(len(rl.agent.Qhx[q])))) ### create array of zeros for that phase/state/action
+                            else:
+                                Qhx[q][state][ac][arr_num]=np.zeros(len(rl.agent.Qhx[q])) ### create array of zeros for that phase/state/action
+                        elif stn<np.shape(rl.agent.Qhx[q])[1]:
+                            if len(Qhx[q][state][ac][arr_num]):
+                                Qhx[q][state][ac][arr_num]=np.concatenate((Qhx[q][state][ac][arr_num],rl.agent.Qhx[q][:,stn,rl.agent.actions[ac]]))
+                            else:
+                                Qhx[q][state][ac][arr_num]=rl.agent.Qhx[q][:,stn,rl.agent.actions[ac]]
+
+    return Qhx, boundary,ideal_states
+
 def Qhx_multiphase(states,actions,agents,numQ):
     #find the state number corresponding to states for each learning phase
+    #this does not work if each phase starts from New - not using oldQ
     state_digits=1
     state_nums={q:{state:[] for state in states} for q in range(numQ)}
     ideal_states={q:{} for q in range(numQ)}
     num_states=1
-    for rl in agents:        
+    for rl in agents:    
         for q in range(numQ):
-            for state in states:
+            for state in states: #identify the state number (index into ideal_states) for state
                 for stnum,st in rl.agent.ideal_states[q].items():
+                    ######## Note, 'loc',[0] and 'tone',[1] below implies each state has two components. Need to generalize this
                     if int(round(st[0]))==rl.env.states['loc'][state[0]] and int(round(st[1]))==rl.env.states['tone'][state[1]]:
                         state_nums[q][state].append(stnum)
-                state_nums[q][state]= list(np.unique(state_nums[q][state]))
+                state_nums[q][state]= list(np.unique(state_nums[q][state])) #next line may fail if subsequent agents don't use oldQs
                 ideal_states[q][state]=[[str(round(a,state_digits)) for a in rl.agent.ideal_states[q][stnum]] for stnum in state_nums[q][state]]
                 num_states=max(num_states,len(state_nums[q][state]))
     #concatenate Q value history across phases for above states and actions
@@ -59,6 +107,39 @@ def Qhx_multiphase(states,actions,agents,numQ):
                             else:
                                  Qhx[q][state][ac][arr_num]=np.zeros(len(rl.agent.Qhx[q]))  
     return Qhx, boundary,ideal_states
+
+def plot_Qhx_OpAL(Qhx,boundary,ept,ac,title='',labels=None):
+    from matplotlib import pyplot as plt
+    colors=[plt.get_cmap('Blues'),plt.get_cmap('Reds'),plt.get_cmap('Purples'),plt.get_cmap('Greys')]
+    qname=['G','N']
+    if list(Qhx.keys())==[0,1]:
+        fig,axis=plt.subplots(len(Qhx[list(Qhx.keys())[0]]),3,sharex=True)
+    else:
+        fig,axis=plt.subplots(len(Qhx[list(Qhx.keys())[0]]),len(Qhx.keys()),sharex=True)
+    ax=fig.axes
+    fig.suptitle(title)
+    for col,q in enumerate(Qhx.keys()):
+        for row,state in enumerate(Qhx[q].keys()): 
+            axnum=col+row*len(Qhx)
+            axtot=2+row*len(Qhx)
+            for arr_num,arr in enumerate((Qhx[q][state][ac])):
+                col_inc=colors[0].N*(5/6)/len(boundary[q][state])
+                if list(Qhx.keys())==[0,1]:
+                    arrTot=Qhx[0][state][ac][arr_num]+Qhx[1][state][ac][arr_num]
+                for b in range(len(boundary[q][state])-1):
+                    color=colors[0].reversed().__call__(int(b*col_inc))
+                    bstart=int(boundary[q][state][b]*ept)
+                    bend=int(boundary[q][state][b+1]*ept)
+                    Xvals=np.arange(0,bend-bstart)
+                    ax[axnum].plot(Xvals,arr[bstart:bend],label=ac,color=color)
+                    if list(Qhx.keys())==[0,1]:
+                        ax[axtot].plot(Xvals,arrTot[bstart:bend],label=ac,color=color)
+                        ax[axtot].set_ylabel('G+N')
+                        ax[axtot].set_xlabel('Trial',fontsize=fsizeSml+1)
+            ax[axnum].set_xlabel('Trial',fontsize=fsizeSml+1)
+        ax[col].set_ylabel(qname[col])
+    ax[0].legend(labels)
+    return fig
 
 def plot_Qhx_2D(Qhx,boundary,ept,phases,ideal_states=None,fig=None,ax=None,title=''):
     ######### plot Qhx for bandit and Discrim task #############
@@ -99,7 +180,10 @@ def plot_Qhx_2D(Qhx,boundary,ept,phases,ideal_states=None,fig=None,ax=None,title
             #Next 3 lines are just for block case.
             startx=0#160#
             endx=Xvals[-1]
-            ax[axnum].set_xlim(startx,endx+(endx-startx)*0.05)
+            if endx>startx:
+                ax[axnum].set_xlim(startx,endx+(endx-startx)*0.05)
+            else:
+                print(Xvals)
             handles,labels=ax[axnum].get_legend_handles_labels()
             if leg_cols==2:
                 newlabels=[letters[int(lbl.split()[-1])] for lbl in labels]#for Qhx figure in manuscript
@@ -144,7 +228,7 @@ def plot_Qhx_2D(Qhx,boundary,ept,phases,ideal_states=None,fig=None,ax=None,title
             #    fig.text(0.02,y,letters[row], fontsize=fsize)
     return fig
 #normalize to optimal?  But what is optimal here?  
-def agent_response(runs,random_order,num_blocks,traject_dict,fig=None,ax=None,norm=1):
+def agent_response(runs,random_order,num_blocks,traject_dict,trials_per_block,fig=None,ax=None,norm=1):
     for rr,r in enumerate(runs):
         if rr>0 or (fig is None):
             fig,ax=plt.subplots()
@@ -156,14 +240,17 @@ def agent_response(runs,random_order,num_blocks,traject_dict,fig=None,ax=None,no
             left[start:end]=np.array(traject_dict[key][(('Pport', '6kHz'), 'left')][r])*norm
             right[start:end]=np.array(traject_dict[key][(('Pport', '6kHz'), 'right')][r])*norm
         #now plot the single trials            
-        ax.plot(left,'blue',label='left')
-        ax.plot(right,'red',label='right')
+        ax.plot(left,'b.',label='left')
+        ax.plot(right,'r.',label='right')
         ax.set_ylabel('Response Rate')
-        ax.set_xlabel('Block')
+        ax.set_xlabel('Trial')
+        print('num_blocks',num_blocks,'left',len(left),trials_per_block)
+        xticks=np.arange(0,len(left),10)*trials_per_block
+        ax.set_xticks(np.arange(0,len(left),10),xticks)
         ylim=ax.get_ylim()
         for k,key in enumerate(random_order[r]):
             ax.text((k+0.5)*num_blocks,ylim[1],key,ha='center',transform=ax.transData)
-            ax.vlines(k*num_blocks,0,10.1,linestyles='dashed')
+            ax.vlines(k*num_blocks,0,10.1,color='gray',linestyles='dashed',linewidths=1)
         ax.set_xlim([0,len(left)])        
         ax.set_ylim([ylim[0],ylim[1]*1.1])
         ax.legend()#loc='center')
@@ -359,7 +446,7 @@ def combined_bandit_Qhx_response(random_order,num_blocks,traject_dict,Qhx,bounda
     for row in range(numrows):
         ax.append(fig.add_subplot(gs[row,:]))
     
-    agent_response([agent_num],random_order,num_blocks,traject_dict,fig,ax[0],norm=norm)
+    agent_response([agent_num],random_order,num_blocks,traject_dict,trials_per_block,fig,ax[0],norm=norm)
     fig=plot_Qhx_2D(Qhx,boundaries,ept,phases,fig=fig,ax=[ax[1],ax[2]]) 
     Xvals=np.arange(len(all_beta[agent_num]))/ept
     ax[3].plot(Xvals,all_beta[agent_num])
@@ -380,7 +467,7 @@ def combined_bandit_Qhx_response(random_order,num_blocks,traject_dict,Qhx,bounda
     for row in range(len(fig.axes)):
         y=(1-blank)-(row*label_inc) #subtract because 0 is at bottom
         fig.text(0.02,y,letters[row], fontsize=fsize)
-    fig.tight_layout()
+    #fig.tight_layout()
     return fig
 
 def staticQ(f,figs,nQ):
@@ -424,7 +511,7 @@ def combined_discrim_Qhx(Qhx,boundaries,ept,phases,all_ideals,all_beta=[],Qlen=[
     if isinstance(all_beta,list):
         beta=all_beta[agent]
         Xvals=np.arange(len(beta))/ept
-        ax[beta_axnum].plot(Xvals,beta)
+        ax[beta_axnum].plot(Xvals,beta,color='green')
         #ax[beta_axnum].plot(Xvals,np.mean(beta,axis=0))
     else:
         for key in all_beta.keys():
@@ -438,14 +525,15 @@ def combined_discrim_Qhx(Qhx,boundaries,ept,phases,all_ideals,all_beta=[],Qlen=[
     ax[beta_axnum].set_yticks(np.arange(min_beta,max_beta+.01,0.5),yticks)
     #ax[beta_axnum].legend()
     if len(Qlen):
+        qcolors=['magenta','purple']
         qnum=beta_axnum+1
         for key1,data in Qlen.items(): 
             if isinstance(data,dict):
                 for key2,d2 in Qlen[key1].items():
-                    ax[qnum].plot(Xvals,d2[agent],label=key1+',Q'+str(key2))
+                    ax[qnum].plot(Xvals,d2[agent],label=key1+',Q'+str(key2),color=qcolors[key1])
                 ymax=np.max([d2[agent] for d2 in Qlen[key1].values()] )
             else:           
-                ax[qnum].plot(Xvals,data[agent],label='Q'+str(key1+1))
+                ax[qnum].plot(Xvals,data[agent],label='Q'+str(key1+1),color=qcolors[key1])
                 ymax=np.max([data[agent] for data in Qlen.values()] )
         ax[qnum].legend()
         ax[qnum].set_ylabel('States',fontsize=fsizeSml+1)
@@ -484,7 +572,7 @@ def new_xlim(figs,xlim):
         for axis in ax:
             axis.set_xlim(xlim)
 
-def load_data(Qfil,trial,parname='params'):
+def load_data(Qfil,parname='params'):
     data=np.load(Qfil,allow_pickle=True)
     try:
         allQhx=data['all_Qhx'].item()
@@ -496,8 +584,6 @@ def load_data(Qfil,trial,parname='params'):
     except:
         all_bounds=data['all_bounds']
         all_ideals=data['all_ideals']
-    if isinstance(allQhx,np.ndarray) or isinstance(allQhx,list):
-        Qhx=allQhx[trial]
     if 'all_beta' in data.keys(): #files beginning on 3 June 2022
         try:
             all_beta=data['all_beta'].item()
@@ -519,7 +605,8 @@ def load_data(Qfil,trial,parname='params'):
 
 if __name__ == "__main__":
     import os
-    task='AIP'#'sequence'# 'Discrim' #'Bandit' #
+    task='Bandit' #'AIP'#'sequence'# 'Discrim' ##
+    meanQ=False #make true in banditFiles.py if you know that meanQ has been added to file, e.g. if use_oldQ is False for bandit
     if task=='sequence':
         from sequenceFiles import fil,param_name        
         figs={q:{} for q in fil.keys()}
@@ -544,8 +631,8 @@ if __name__ == "__main__":
         fig=plot_Qhx_sequence_1fig(allQhx,state_action_combos,actions_colors,events_per_trial,actions_lines)
     else:
         if task=='Bandit':
-            from banditFiles import fil
-            trial=1 #Bandit, [3,23,39] for June 3 2022 #[2,5,28] - for June 6, 2022
+            from banditFiles import fil, meanQ
+            trial=[4] #Bandit, [3,23,39] for June 3 2022 #[2,5,28] - for June 6, 2022
         elif task=='Discrim':
             from discrimFiles import fil
             trial=0
@@ -558,8 +645,8 @@ if __name__ == "__main__":
                 Qfil=os.path.dirname(f)+'/Qhx'+os.path.basename(f)+'.npz'
             else:
                 Qfil='Qhx'+os.path.basename(f)+'.npz'
-            all_Qhx,all_bounds,all_ideals,all_beta,all_lenQ,events_per_trial,trials_per_block,phases=load_data(Qfil,trial)
-            if task=='Bandit': #bandit task only, Qhx for all trials is saved
+            all_Qhx,all_bounds,all_ideals,all_beta,all_lenQ,events_per_trial,trials_per_block,phases=load_data(Qfil)
+            if task=='Bandit': #bandit task only, Qhx for all trials is saved for more recent simulations, need random_order
                 data=np.load(Qfil,allow_pickle=True)
                 norm=1/trials_per_block 
                 phases=data['phases']
@@ -570,25 +657,42 @@ if __name__ == "__main__":
                 else:
                     #order of probability not saved, except for last trial
                     random_order=[phases]
-                    trial=-1
-                Qhx=all_Qhx[trial]
-                bounds=all_bounds[trial]
+                    trial=[-1]
+                if isinstance(all_Qhx,dict):
+                    Qhx=all_Qhx
+                else:
+                    Qhx=all_Qhx[trial[0]]
+                for nk in Qhx.keys():
+                    if ('start','blip') in Qhx[nk].keys():
+                        del Qhx[nk][('start','blip')]
+                for nk in Qhx.keys():
+                    for st in Qhx[nk].keys():
+                        if 'center' in Qhx[nk][st]:
+                            del Qhx[nk][st]['center']
+                bounds=all_bounds[trial][0]
                 ideals=all_ideals[trial]               
+                num_trials=int(len(all_lenQ[0][0])/events_per_trial)
                 if 'num_blocks' in data.keys():
                     num_blocks=data['num_blocks'].item()
                 else: #forgot to store num_blocks.  calculate it
-                    numevents=len(all_lenQ[0][0])
-                    num_trials=numevents/events_per_trial
                     trials_per_phase=num_trials/len(phases)
                     num_blocks=int(trials_per_phase/trials_per_block) #10
                 print(Qfil,num_blocks)
                 data2=np.load(f+'.npz',allow_pickle=True)
                 traject_dict=data2['traject_dict'].item()
-                agent_response([trial],random_order,num_blocks,traject_dict,norm=norm)
-                fig_combined=combined_bandit_Qhx_response(random_order,num_blocks,traject_dict,Qhx,bounds,events_per_trial,phases,agent_num=trial,all_beta=all_beta,norm=norm)#,all_lenQ)
+                agent_response(trial,random_order,num_blocks,traject_dict,trials_per_block,norm=norm)
+                if meanQ:  #the mean over Q has been added, plot that
+                    trial=-1 #mean Qhx
+                    #fig=plot_Qhx_2D(Qhx,bounds,events_per_trial,phases)
+                    lbl=sorted(random_order[0], key=lambda x: float(x.split(':')[0])/float(x.split(':')[1]))
+                    fig=plot_Qhx_OpAL(Qhx,bounds,events_per_trial,'left',labels=lbl)
+                    title='meanQ'
+                    fig.suptitle(title)
+                else:
+                    fig_combined=combined_bandit_Qhx_response(random_order,num_blocks,traject_dict,Qhx,bounds,events_per_trial,phases,agent_num=trial[0],all_beta=all_beta,norm=norm)#,all_lenQ)
             else: #Discrim, or older Bandit files, random order not saved, all_Qhx is single dictionary,
                 states=['Pport,6kHz 0','Pport,10kHz 0'] #for discrim,reverse
-                #states=['Pport,6kHz 1'] #for acq,extinct
+                states=['Pport,6kHz 1'] #for acq,extinct
                 if task=='AIP':
                     states=['Pport,10kHz 0'] #for acq,discrim with block
                 if len(all_Qhx)>1:
@@ -623,3 +727,9 @@ if __name__ == "__main__":
                 #figs=staticQ(f,figs,nQ)
                 if 'Pport,10kHz 0' in states and task != 'AIP':
                     new_xlim(figs[nQ],[190,610])
+#figs['2']['qhxPport,6kHz 0'].tight_layout()
+#figs['2']['qhxPport,10kHz 0'].tight_layout() 
+#axes=figs['2']['qhxPport,6kHz 1'].axes
+#axes=figs['2']['qhxPport,10kHz 0'].axes #for block case
+#for ax in axes:
+#    ax.set_xlim([-1,401])#601])
