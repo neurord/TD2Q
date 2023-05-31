@@ -122,7 +122,7 @@ if __name__ == "__main__":
         phases=[['acquire','discrim']] 
     elif extinct.startswith('A'):
         state_sets=[[('Pport','6kHz')]]
-        phases=[['acquire','extinc','renew']] 
+        phases=learn_phases
     else:
         state_sets=[[('Pport','6kHz'),('Pport','10kHz')],[('Pport','6kHz')]]
         phases=[['acquire','discrim','reverse'],['acquire','extinc','renew']] 
@@ -138,6 +138,8 @@ if __name__ == "__main__":
     params['beta_GPi']=10
     params['gamma']=0.82
     params['state_units']['context']=False
+    params['initQ']=-1 #-1 means do state splitting.  If initQ=0, 1 or 10, it means initialize Q to that value and don't split
+    params['D2_rule']= None #'Ndelta' #'Bogacz' #'Opal' #None ### Ndelta: calculate delta from N matrix to update N. Opal: Opal update without critic
     if params['distance']=='Euclidean':
         #state_thresh={'Q1':[0.875,0],'Q2':[0.875,1.0]} #For Euclidean distance
         #alpha={'Q1':[0.2,0],'Q2':[0.2,0.1]}    #For Euclidean distance
@@ -150,7 +152,6 @@ if __name__ == "__main__":
     params['state_thresh']=state_thresh['Q'+str(params['numQ'])] #for euclidean distance, no noise
     #lower means more states for Euclidean distance rule
     params['alpha']=alpha['Q'+str(params['numQ'])] #  
-    params['split']=True #if False - initialize new row in Q matrix to 0; if True - initialize to Q values of best matching state   
     traject_title='num Q: '+str(params['numQ'])+' rule:'+str( params['decision_rule'])+' forget:'+str(params['forgetting'])
     ################# For OpAL ################
     params['use_Opal']=False
@@ -162,16 +163,17 @@ if __name__ == "__main__":
         params['beta_min']=1
         params['beta']=1
         params['gamma']=0.1 #called alpha_c in OpAL
-        params['split']=False #### initialize all new states to 1
-        params['use_Opal']=True
+        params['initQ']=1 #do not split states, initialize Q values to 1
         params['state_thresh']=[0.75,0.625]
+        params['D2_rule']='Opal'
+        noise=0.05
     ######################################
-    from DiscriminationTaskParam2 import Racq,Tacq,env_params
+    from DiscriminationTaskParam2 import Racq,Tacq,env_params, rwd
     epochs=['Beg','End']
     
     if PREE:
         traject_title+=' PREE:'+str(PREE)
-        from DiscriminationTaskParam2 import loc, tone, rwd
+        from DiscriminationTaskParam2 import loc, tone
         Racq[(loc['Pport'],tone['6kHz'])][act['left']]=[(rwd['reward'],PREE),(rwd['base'],1-PREE)]   #lick in left port - 90% reward   
     keys=rlu.construct_key(action_items +['rwd'],epochs)
     resultslist={phs:{k+'_'+ep:[] for k in keys.values() for ep in epochs} for phs in learn_phases}
@@ -195,15 +197,14 @@ if __name__ == "__main__":
     for r in range(runs):
         rl={}
         if 'acquire' in learn_phases:
-            if runs==1:
-                print('&&&&&&&&&&&&&&&&&&&& acquire',states,'\n  R:',Racq.keys(),'\n  T:',Tacq.keys(),' cues:',acq_cue)
+            print('&&&&&&&&&&&&&&&&&&&& acquire for run',r, states,'\n  R:',Racq.keys(),'\n  T:',Tacq.keys(),' cues:',acq_cue)
             ######### acquisition trials, context A, only 6 Khz + L turn allowed #########
             rl['acquire'] = RL(tone_discrim.completeT, QL.QL, states,act,Racq,Tacq,params,env_params,printR=printR)
             results,acqQ=rlu.run_sims(rl['acquire'],'acquire',numevents,trial_subset,action_items,noise,Info,acq_cue,r,results,phist=plot_hist,block_DA=block_DA_dip)
             traject_dict=rl['acquire'].trajectory(traject_dict, traject_items,events_per_block)
         if 'extinc' in learn_phases:
             if runs==1:
-                print('&&&&&&&&&&&&&&&&&&&& extinction',states,' cues:',ext_cue)
+                print('&&&&&&&&&&&&&&&&&&&& extinction for run',r, states,' cues:',ext_cue)
             from DiscriminationTaskParam2 import Rext,Tacq
             rl['extinc'] = RL(tone_discrim.completeT, QL.QL, states,act,Rext,Tacq,params,env_params,printR=printR,oldQ=acqQ)
             results,extQ=rlu.run_sims(rl['extinc'],'extinc',numevents,trial_subset,action_items,noise,Info,ext_cue,r,results,phist=plot_hist,block_DA=block_DA_dip)
@@ -211,7 +212,7 @@ if __name__ == "__main__":
         #### renewal - blocking D2 or Da Dip not tested
         if 'renew' in learn_phases:
             if runs==1:
-                print('&&&&&&&&&&&&&&&&&&&& renewal',states,' cues:',acq_cue)
+                print('&&&&&&&&&&&&&&&&&&&& renewal for run',r, states,' cues:',acq_cue)
             rl['renew'] = RL(tone_discrim.completeT, QL.QL, states,act,Rext,Tacq,params,env_params,printR=printR,oldQ=extQ)
             results,renQ=rlu.run_sims(rl['renew'],'renew',numevents,trial_subset,action_items,noise,Info,ren_cue,r,results)
             traject_dict=rl['renew'].trajectory(traject_dict, traject_items,events_per_block)
@@ -220,7 +221,7 @@ if __name__ == "__main__":
             #use last context in the list
             from DiscriminationTaskParam2 import Rdis,Tdis
             if runs==1:
-                print('&&&&&&&&&&&&&&&&&&&& discrimination',states,'\n  R:',Rdis.keys(),'\n  T:',Tdis.keys(),' cues:',dis_cue)
+                print('&&&&&&&&&&&&&&&&&&&& discrimination for run',r, states,'\n  R:',Rdis.keys(),'\n  T:',Tdis.keys(),' cues:',dis_cue)
             if 'acquire' in learn_phases: #expand previous covariance matrix and Q with new states
                 rl['discrim'] = RL(tone_discrim.completeT, QL.QL, states,act,Rdis,Tdis, params,env_params,oldQ=acqQ)
                 acq_first=True
@@ -264,7 +265,7 @@ if __name__ == "__main__":
         all_Qhx.append(one_Qhx)
         all_ideals.append(one_ideals)
         all_bounds.append(one_bounds)
-######### Average over runs, also need stdev.  
+    ######### Average over runs, also need stdev.  
     all_ta=[]; output_data={}
     for phs in traject_dict.keys():
         output_data[phs]={}
@@ -286,7 +287,7 @@ if __name__ == "__main__":
     print('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%')
     print(' Using',params['numQ'], 'Q, alpha=',params['alpha'],'thresh',params['state_thresh'], 'beta=',params['beta'],'runs',runs,'of total events',numevents)
     print(' apply learning_weights:',[k+':'+str(params[k]) for k in params.keys() if k.startswith('wt')])
-    print(' forgetting=',params['forgetting'],'Q2 hetero=',params['Q2other'],'decision rule=',params['decision_rule'],'split=',params['split'])
+    print(' D2_rule=',params['D2_rule'],'decision rule=',params['decision_rule'],'split=',params['initQ'],'critic=',params['use_Opal'])
     print('counts from ',trial_subset,' events (',events_per_trial,' events per trial)          BEGIN    END    std over ',runs,'runs')
     for phase in results.keys():
         for sa,counts in results[phase].items():
@@ -320,9 +321,9 @@ if __name__ == "__main__":
         import datetime
         dt=datetime.datetime.today()
         date=str(dt).split()[0]
-        fname=fname+date+'_numQ'+str(params['numQ'])+'_alpha'+'_'.join([str(a) for a in params['alpha']])\
-        +'_st'+'_'.join([str(st) for st in params['state_thresh']])+'_q2o'+str(params['Q2other'])+'_gamma'+str(params['gamma'])+\
-            '_bmin'+str(params['beta_min'])+'_bmax'+str(params['beta'])+'_split'+str(params['split'])+'_rule'+str(params['decision_rule'])
+        key_params=['numQ','Q2other','beta_GPi','decision_rule','beta_min','beta','gamma','use_Opal','D2_rule']
+        fname_params=key_params+['initQ']
+        fname=fname+date+'_'.join([k+str(params[k]) for k in fname_params])+'_rwd'+str(rwd['reward'])
         np.savez(fname,par=params,results=resultslist,traject=output_data)
         if plot_Qhx==2:
             np.savez('Qhx'+fname,all_Qhx=all_Qhx,all_bounds=all_bounds,events_per_trial=events_per_trial,phases=phases,all_ideals=all_ideals,all_beta=all_beta,all_lenQ=all_lenQ)
