@@ -1,5 +1,5 @@
-#*.npz
-#*.npy
+*.npz
+*.npy
 *.png
 *.pyc
 *.slurm
