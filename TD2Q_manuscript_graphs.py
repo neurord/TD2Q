@@ -383,7 +383,7 @@ def calc_norm(params,percent=False):
 
 if __name__ == "__main__":
     #for stats, only run one at a time
-    task='block_da'# 'sequence' #  'discrim' #'bandit'#
+    task= 'bandit'# 'discrim' #'AIP'# 'sequence' #
     add_barplot=0 #only relevant for sequence
     shift_stay=0 #only relevant for bandit
     test_var=[]
@@ -418,7 +418,7 @@ if __name__ == "__main__":
                 axis.set_xlim(xlim)
 
     ######################### block Dopamine #########################
-    elif task=='block_da':
+    elif task=='AIP':
         from discrimFiles import pattern,dep_var,files,test_variables,actions,action_text,keys
         print(actions)
         traject,_,_,params,_=read_data(pattern, files, keys) 
@@ -513,7 +513,7 @@ if __name__ == "__main__":
         df['RMS']=np.sqrt(df['sum_squares'])
         df['mean_reward']=df.loc[:,test_variables].mean(axis=1)
         test_variables=['mean_reward','RMS']
-    if os.path.basename(pattern).upper().startswith('DISCRIM') and task != 'block_da':
+    if os.path.basename(pattern).upper().startswith('DISCRIM') and task != 'AIP':
         df['mean_reward']=df.loc[:,['reverse_rwd__End','discrim_rwd__End']].mean(axis=1)
         test_variables=['mean_reward','acquire_rwd__End','reverse_rwd__End','discrim_rwd__End']
         #test_variables=['acquire_rwd__End','discrim_rwd__End','extinc_Pport_6kHz_left_Beg']#,'renew_Pport_6kHz_left_Beg']
@@ -574,7 +574,7 @@ if __name__ == "__main__":
         if testdf[dep_var].nunique().sum()==2:
             unique_vals=np.unique(testdf[dep_var[0]])
             tt=ttest_ind(testdf[testdf[dep_var[0]]==unique_vals[0]][tv], testdf[testdf[dep_var[0]]==unique_vals[1]][tv], equal_var=False)
-            print('\n*******',tv,'\n',tt)      
+            print('\n*******',tv,'\n',tt,'\n mean:\n',mean[tv],'\n sterr:\n',sterr[tv])      
         else:
             dependents=['C('+dv+')' for dv in dep_var]
             model_statement=' ~ '+'+'.join(dependents)

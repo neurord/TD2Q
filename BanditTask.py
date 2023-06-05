@@ -285,6 +285,11 @@ if __name__ == '__main__':
     key_list=list(prob_sets.keys())
     ######## Initiate dictionaries storing stay shift counts
     all_counts={'left_rwd':{},'left_none':{},'right_rwd':{},'right_none':{}}
+    if step1:
+        extra_acts=[]
+    else:
+        extra_acts=['hold', 'wander']
+    #extra_acts=['hold'] for simpler 3 step task
     for key,counts in all_counts.items():
         for phase in learn_phases:
             counts[phase]={'stay':[0]*runs,'shift':[0]*runs}

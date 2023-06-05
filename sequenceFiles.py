@@ -92,7 +92,8 @@ elif submission>=2:
                       dep_var=dep_var+['D2_rule']
                       keys=['numQ1','numQ2','Ndelta']
         elif test=='gamma':        #test gamma
-                pattern=subdir0+'Sequence2023-01-10numQ2_Q2other0.0_decision_ruleNone_beta3_beta_min0.5_gamma*_beta_GPi10_rwd15_splitTrue*'
+                pattern=subdir0+'Sequence2023-01-10numQ1_Q2other0.0_decision_ruleNone_beta3_beta_min0.5_gamma*_beta_GPi10_rwd15_splitTrue*'
+                #pattern=subdir0+'Sequence2023-01-10numQ2_Q2other0.0_decision_ruledelta_beta3_beta_min0.5_gamma*_beta_GPi10_rwd15_splitTrue*'
         elif test=='beta':        #test beta
                 pattern=subdir0+'Sequence2023-01-11numQ2_Q2other0.0_decision_ruleNone_beta*_beta_min0.5_gamma0.95_beta_GPi10_rwd15_splitTrue*'
         elif test=='Q2other':
