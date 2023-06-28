@@ -53,12 +53,12 @@ elif submission>=2:
         files=[subdir0+'Discrim2022-12-19_numQ1_alpha0.3_0_st1.0_0_q2o0.1_gamma0.82_bmin0.5_bmax1.5_splitTrue_ruleNone.npz',
             subdir0+'Discrim2023-01-10numQ2_Q2other0.0_beta_GPi10_decision_ruleNone_beta_min0.5_beta1.5_gamma0.82_splitTrue.npz']
         fil={'2':subdir0+'Discrim2023-01-10numQ2_Q2other0.0_beta_GPi10_decision_ruleNone_beta_min0.5_beta1.5_gamma0.82_splitTrue',
-            '1':subdir0+'Discrim2022-12-19_numQ1_alpha0.3_0_st1.0_0_q2o0.1_gamma0.82_bmin0.5_bmax1.5_splitTrue_ruleNone'} #Qhx file has been lost
+            '1':subdir0+'Discrim2022-12-19_numQ1_alpha0.3_0_st1.0_0_q2o0.1_gamma0.82_bmin0.5_bmax1.5_splitTrue_ruleNone'} #Qhx file for 1Q has been lost
     if test=='split':
-        keys=['initQ=0','split', 'initQ=1']
+        keys=['initQ=0','split']#, 'initQ=1']
         files=[subdir0+'Discrim2023-01-10_numQ2_alpha0.2_0.1_st0.75_0.625_q2o0.0_gamma0.82_bmin0.5_bmax1.5_splitFalse_ruleNone.npz',
-               subdir0+'Discrim2023-01-10numQ2_Q2other0.0_beta_GPi10_decision_ruleNone_beta_min0.5_beta1.5_gamma0.82_splitTrue.npz',
-               subdir0+'Discrim2023-04-27_numQ2_alpha0.2_0.1_st0.75_0.625_q2o0.0_gamma0.82_bmin0.5_bmax1.5_split1_ruleNone.npz']
+               subdir0+'Discrim2023-01-10numQ2_Q2other0.0_beta_GPi10_decision_ruleNone_beta_min0.5_beta1.5_gamma0.82_splitTrue.npz']#,
+               #subdir0+'Discrim2023-04-27_numQ2_alpha0.2_0.1_st0.75_0.625_q2o0.0_gamma0.82_bmin0.5_bmax1.5_split1_ruleNone.npz']
     if test=='alpha':
         import glob
         newfiles=glob.glob(subdir0+'Discrim2023-04-21_numQ2_alpha0.2_*_st0.75_0.625_q2o0.0_gamma0.82_bmin0.5_bmax1.5_split-1_ruleNone.npz')

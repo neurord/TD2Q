@@ -86,7 +86,13 @@ Q learning model with Q matrices representing dSPN and iSPN, state-splitting, an
   * 'delta': choose action based on difference between Q1 and Q2 matrix
 - params['Q2other']=0.0 #fractional learning rate (multiplied by alpha) for Q2 values for NON-selected actions, i.e. heterosynaptic plasticity
 - params['distance']='Euclidean' #determine best matching state based on Euclidean distance, alternative: "Gaussian": mahalanobis distance
-- params['split']=True #initialize new row of Q matrix as values of best matching state (if False, initialize to zero).  
+- params['initQ']=-1 
+	*-1 means do state splitting (initialize new row of Q matrix as values of best matching state). 
+	* initQ=0, 1 or 10,  means initialize Q to that value and don't split
+	* params['initQ']=-1 is same as params['split']=True from earlier version.
+	* params['initQ']=0 is same as params['split']=False from earlier version. 
+- params['D2_rule']= None ### Opal: use Opal update rule without critic, Ndelta: calculate delta for N matrix from N values
+- params['use_Opal'] = False ## Use Opal algorithm: implement critic, use Opal update rule, and use delta decision rule
 
 
 
