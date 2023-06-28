@@ -7,9 +7,9 @@ Created on Wed Aug 19 12:12:28 2020
 
 ############ reward   ################
 rwd={'error':-5,'reward':10,'base':-1,'none':-1,'partial':0} 
-#rwd={'error':-1,'reward':8,'base':0,'none':0,'partial':0}  #use these for Opal and Bogacz? - same mean rwd per trial
-#rwd={'error':-1,'reward':6,'base':0,'none':0,'partial':1} #use these for Opal and Bogacz? - same mean rwd per trial
-#rwd={'error':-2,'reward':5,'base':-0.5,'none':-0.5,'partial':0}  #show more lose-shift and sampling behavior?
+#rwd={'error':-1,'reward':8,'base':0,'none':0,'partial':0}  #use these for Opal and Bogacz to show that 3 step tasks do not work - same mean rwd per trial
+#rwd={'error':-1,'reward':6,'base':0,'none':0,'partial':1} #use these for Opal and Bogacz to improve performance on 3 step tasks - same mean rwd per trial
+#rwd={'error':-2,'reward':5,'base':-0.5,'none':-0.5,'partial':0}  #show more lose-shift and sampling behavior? No
 ######### Parameters for the agent ##################################
 params={}
 params['wt_learning']=False

@@ -29,12 +29,20 @@ Q learning model with Q matrices representing dSPN and iSPN, state-splitting, an
 	* At the poke port, the agent hears a single tone (go cue) which contains no information about which port is rewarded. 
 	* To receive a reward, the agent has to select either left port or right port.  
 	* Both left and right choices are rewarded with probabilities assigned independently, and which change periodically.  
+	* This task can be run as 1 step task by setting step1=True
 	
 - SequenceTask.py
 	* parameters, including reward and transition matrix, in SequenceTaskparam.py
 	* the task is that reported in Geddes et al. Cell 2018
 	* the agent must press the left lever twice, and then the right lever twice to obtain a reward. 
 	* There are no external cues to indicate when the left lever or right lever need to be pressed.
+	* the minimum number of steps per trial is 7
+
+- Any of the above programs can be run with the default parameters. Or you can adjust the following values
+	* runs: number of agents, or how many times the task will be simulated. Equivalent to biological replicates
+	* trials: number of actions the agent will take for a single run.  For a 3 step task (BanditTask and Discrim), the number of trials is approximately trials/3
+	* save_data: set to False if you do not want to save the output to disk
+	* plot_Qhx: higher number gives more graphs
 
 **B. Other files**
 - agent_twoQtwoSsplit.py
@@ -72,6 +80,10 @@ Q learning model with Q matrices representing dSPN and iSPN, state-splitting, an
 	* summary results saved in .npy files
 
 **C. Parameters**
+- runs: number of agents, or how many times the task will be simulated. Equivalent to biological replicates
+- trials: number of actions the agent will take for a single run.  For a 3 step task (BanditTask and Discrim), the number of trials is approximately trials/3
+- save_data: set to False if you do not want to save the output to disk
+- plot_Qhx: higher number gives more graphs
 - params['numQ']=1 #number of Q matrices.  numQ=2 is improves the 2-arm bandit task and sequence task.  No effect on discirmination/extinction
 - params['alpha']=[0.3,0.06]  # learning rate for Q1 and (optionally Q2) matrices.  Task dependent
 - params['beta']=1.5  # maximum value of inverse temperature, controls exploration-exploitation

@@ -59,7 +59,7 @@ elif submission==2:
         files=None
 elif submission==3:
     subdir0='Bandit2023may19/'
-    test='OpAL'#'numQ' #'initQ'#'window_bmin'#'beta'#'gamma' #'rwd'#'alpha'#,'beta_min', 'decision_rule' 'AIP' 'Q2other'#
+    test='numQ' #'window_bmin'#'OpAL'#'initQ'#'beta'#'gamma' #'rwd'#'alpha'#,'beta_min', 'decision_rule' 'AIP' 'Q2other'#
     dep_var=[test]#  ,'beta_min'] for statistic test of constant beta.  Move beta_min0.1 files out of directory
     files=None
     # for Q2 trajectory
@@ -72,7 +72,7 @@ elif submission==3:
             '2':subdir0+'Bandit2023-05-26numQ2_Q2other0.0_beta_GPi10_decision_ruleNone_beta_min0.5_beta1.5_gamma0.82_use_OpalFalse_step1False_D2_ruleNone_initQ-1_rwd10_-1_wanderTrue'}
         files=[subdir0+'Bandit2023-05-26numQ1_Q2other0.0_beta_GPi10_decision_ruleNone_beta_min0.5_beta1.5_gamma0.82_use_OpalFalse_step1False_D2_ruleNone_initQ-1_rwd10_-1_wanderTrue.npz',
                 subdir0+'Bandit2023-05-26numQ2_Q2other0.0_beta_GPi10_decision_ruleNone_beta_min0.5_beta1.5_gamma0.82_use_OpalFalse_step1False_D2_ruleNone_initQ-1_rwd10_-1_wanderTrue.npz']
-        files[1]=subdir0+'Bandit2023-05-26numQ2_Q2other0.0_beta_GPi10_decision_ruleNone_beta_min0.5_beta1.5_gamma0.82_use_OpalFalse_step1False_D2_ruleNone_initQ-1_rwd10_-1_wanderTrueWin1.npz'
+        #files[1]=subdir0+'Bandit2023-05-26numQ2_Q2other0.0_beta_GPi10_decision_ruleNone_beta_min0.5_beta1.5_gamma0.82_use_OpalFalse_step1False_D2_ruleNone_initQ-1_rwd10_-1_wanderTrueWin1.npz'
     elif test=='gamma':
         pattern=subdir0+'Bandit2023-05-19numQ2*decision_ruleNone_beta_min0.5_beta1.5_gamma*_use_OpalFalse_step1False*initQ-1_rwd10_-1*.npz'
     elif test=='beta':

@@ -42,7 +42,7 @@ if submission==1:
 elif submission>=2:
     subdir0='NormEuclidPLoSsubmission2_Q2other0/' #q2other=0.0
     subdir0='ManuscriptFiles/'
-    test='AIP' #'numQ'#'split'# 'alpha'#'gamma' #'beta'# 'beta_min',  'decision_rule' 
+    test='numQ'#'AIP' #'split'# 'alpha'#'gamma' #'beta'# 'beta_min',  'decision_rule' 
     test_variables=['rwd__End']
     dep_var=[test]
     keys=None

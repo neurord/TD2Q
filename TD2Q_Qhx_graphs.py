@@ -613,7 +613,7 @@ if __name__ == "__main__":
         trial=-1
         #
         state_action_combos=[('Llever','---L'),('Llever','--LL'),('Llever', 'RRLL'),('Llever', 'RLLL'),('Rlever','--LL'),('Rlever','LLLL'),('Rlever','RLLL')] #,('Rlever','-LLL')
-        state_action_combos=[('Llever','---L'),('Llever','--LL'),('Rlever','--LL'),('Rlever','LLLL'),('Rlever','-LLR'),('Rlever','LLLR')]#,('Rlever','LLRR')]
+        state_action_combos=[('Llever','---L'),('Llever','--LL'),('Rlever','--LL'),('Rlever','LLLL')]#,('Rlever','-LLR'),('Rlever','LLLR')]#,('Rlever','LLRR')]
         actions_colors={'goL':'b','goR':'r','press':'k','goMag':'gray'}
         actions_lines={'goL':'solid','goR':'solid','press':'dashed','goMag':'dotted'}
         allQhx={}
